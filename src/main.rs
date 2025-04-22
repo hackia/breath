@@ -85,7 +85,7 @@ fn main() -> Result<(), Error> {
         return Err(Error::new(ErrorKind::Other, "Command failed"));
     }
     let mut commit = String::new();
-    let mut x = String::new();
+    let mut x = String::from('\n');
     for title in COMMIT {
         while x.is_empty() {
             ok(title);
