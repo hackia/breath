@@ -1,4 +1,5 @@
 use crossterm::execute;
+use inquire::{Confirm, Editor, Select, Text};
 use spinners::{Spinner, Spinners};
 use std::fs::{File, create_dir_all, read_to_string};
 use std::process::{Command, ExitCode};
@@ -27,6 +28,69 @@ fn ok(
     }
 }
 
+const COMMIT_MESSAGE: &str = r"%type%(%s%): %summary%
+
+%body%
+
+";
+
+fn diff() {
+    Command::new("git")
+        .arg("diff")
+        .status()
+        .expect("Fail to execute command");
+}
+fn commit() -> ExitCode {
+    println!();
+    diff();
+    if Confirm::new("Do you want commit this code ?")
+        .with_default(false)
+        .prompt()
+        .expect("failed")
+    {
+        Command::new("git")
+            .arg("add")
+            .arg(".")
+            .status()
+            .expect("Fail to execute command");
+        let types = vec!["feat", "fix", "chore", "docs", "refactor", "style", "test"];
+        let t = Select::new("Commit types", types.to_vec())
+            .prompt()
+            .expect("failed to get scope");
+        let s = Text::new("Commit scope")
+            .prompt()
+            .expect("failed to get scope");
+        let summary = Text::new("Commit summary")
+            .prompt()
+            .expect("failed to get summary");
+        let message = Editor::new("Commit message")
+            .prompt()
+            .expect("failed to get message");
+
+        let comm = COMMIT_MESSAGE
+            .replace("%type%", t)
+            .replace("%s%", s.as_str())
+            .replace("%body%", message.as_str())
+            .replace("%summary%", summary.as_str());
+
+        Command::new("git")
+            .arg("commit")
+            .arg("-m")
+            .arg(comm)
+            .status()
+            .expect("Fail to execute command");
+        execute!(
+            std::io::stdout(),
+            crossterm::terminal::Clear(crossterm::terminal::ClearType::All),
+            crossterm::cursor::MoveTo(0, 1),
+        )
+        .expect("Fail to clear terminal");
+        ExitCode::SUCCESS
+    } else {
+        println!("Abort commit");
+        ExitCode::SUCCESS
+    }
+}
 fn main() -> ExitCode {
     execute!(
         std::io::stdout(),
@@ -123,6 +187,5 @@ fn main() -> ExitCode {
         eprintln!("Cargo audit detect warning");
         return ExitCode::FAILURE;
     }
-    println!();
-    ExitCode::SUCCESS
+    commit()
 }
