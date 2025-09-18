@@ -101,6 +101,7 @@ fn commit() -> ExitCode {
                 .status()
                 .expect("failed to execute command");
         }
+        println!();
         ExitCode::SUCCESS
     } else {
         println!("Abort commit");
