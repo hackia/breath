@@ -95,6 +95,11 @@ fn commit() -> ExitCode {
                 .arg("--all")
                 .status()
                 .expect("Fail to execute command");
+            Command::new("git")
+                .arg("push")
+                .arg("--tags")
+                .status()
+                .expect("failed to execute command");
         }
         ExitCode::SUCCESS
     } else {

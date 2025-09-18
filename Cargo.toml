@@ -1,13 +1,13 @@
 [package]
 name = "breath"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 authors = ["hackia"]
 license = "AGPL-3.0"
-description = "a tools for commiting rust mercurial source code"
+description = "a tools for commiting rust with git source code"
 categories = ["development-tools"]
 repository = "https://github.com/hackia/breath"
-keywords = ["mercurial", "rust", "commit"]
+keywords = ["git", "rust", "commit"]
 readme = "README.md"
 
 [dependencies]
