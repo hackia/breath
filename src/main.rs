@@ -85,6 +85,17 @@ fn commit() -> ExitCode {
             crossterm::cursor::MoveTo(0, 1),
         )
         .expect("Fail to clear terminal");
+        if Confirm::new("Do you want push to remotes?")
+            .with_default(true)
+            .prompt()
+            .expect("failed to get confirm")
+        {
+            Command::new("git")
+                .arg("push")
+                .arg("--all")
+                .status()
+                .expect("Fail to execute command");
+        }
         ExitCode::SUCCESS
     } else {
         println!("Abort commit");
