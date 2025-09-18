@@ -1,120 +1,128 @@
-use std::io::{Error, ErrorKind};
-use std::process::Command;
+use crossterm::execute;
+use spinners::{Spinner, Spinners};
+use std::fs::{File, create_dir_all, read_to_string};
+use std::process::{Command, ExitCode};
+use std::thread::sleep;
 
-#[doc = "hooks"]
-const WAKEUP: [(&str, &str, &str); 4] = [
-    (
-        "checking format",
-        "fmt --check",
-        "source code respect code format standard",
-    ),
-    (
-        "running source code tests",
-        "test --no-fail-fast",
-        "tests passes",
-    ),
-    ("auditing source code", "audit", "source code secure"),
-    (
-        "checking source code",
-        "clippy -- -D clippy::all -D clippy::cargo",
-        "source code successful",
-    ),
-];
-#[doc = "commit titles"]
-const COMMIT: [&str; 4] = [
-    "enter a summary",
-    "explain the reason to changes",
-    "impact of changes",
-    "resolve issues",
-];
-
-fn ok(out: &str) {
-    println!("\x1b[1;32m    Finished\x1b[0m {out}");
-}
-fn ko(out: &str) {
-    println!("\x1b[1;32m    Stopping\x1b[0m {out}");
-}
-fn confirm(q: &str) -> Result<bool, Error> {
-    let mut x: String = String::new();
-    while x.trim().is_empty() {
-        ok(format!("{q}  y n ?").as_str());
-        match std::io::stdin().read_line(&mut x) {
-            Err(_) => {
-                x.clear();
-            }
-            _ => break,
-        }
-    }
-    Ok(x.contains("y"))
-}
-fn main() -> Result<(), Error> {
-    if confirm("Do you want to run breath")?.eq(&false) {
-        ok("commit aborted");
-        return Ok(());
-    }
-    for (title, args, success) in WAKEUP {
-        ok(title);
-        if Command::new("cargo")
-            .args(args.split_whitespace())
-            .current_dir(".")
-            .spawn()?
-            .wait()?
-            .success()
-        {
-            ok(success);
-        } else {
-            ko("warning detected");
-            return Err(Error::new(ErrorKind::Other, "Command failed"));
-        }
-    }
-    if confirm("show diff")?.eq(&true) {
-        Command::new("git")
-            .args(["diff", "-p"])
-            .current_dir(".")
-            .spawn()?
-            .wait()?;
-    }
-    if confirm("add src to git")?.eq(&true) {
-        Command::new("git")
-            .args(["add", "."])
-            .current_dir(".")
-            .spawn()?
-            .wait()?;
-    } else {
-        ko("source code must be added");
-        return Err(Error::new(ErrorKind::Other, "Command failed"));
-    }
-    let mut commit = String::new();
-    let mut x = String::from('\n');
-    for title in COMMIT {
-        while x.is_empty() {
-            ok(title);
-            std::io::stdin().read_line(&mut x)?;
-            if x.trim().is_empty() {
-                x.clear();
-                continue;
-            }
-        }
-        commit.push('\n');
-        commit.push_str(x.as_str());
-        commit.push('\n');
-
-        x.clear()
-    }
-    if Command::new("git")
-        .arg("commit")
-        .arg("-m")
-        .arg(commit.as_str())
-        .current_dir(".")
-        .spawn()
-        .expect("Commit failed")
-        .wait()
-        .expect("Commit failed")
-        .success()
-    {
-        ok("commited successfully");
+fn ok(
+    message: &str,
+    cmd: &mut Command,
+    success: &str,
+    failure: &str,
+    file: &str,
+) -> std::io::Result<()> {
+    let mut output = Spinner::new(Spinners::Dots2, message.to_string());
+    let status = cmd
+        .stderr(File::create(format!(".breathes/stderr/{file}")).expect("Fail to create file"))
+        .stdout(File::create(format!(".breathes/stdout/{file}")).expect("Fail to create file"))
+        .status()
+        .expect("Fail to execute command");
+    sleep(std::time::Duration::from_millis(250));
+    if status.success() {
+        output.stop_and_persist("*", success.to_string());
         Ok(())
     } else {
-        Err(Error::new(ErrorKind::Interrupted, "Commit failed"))
+        output.stop_and_persist("!", read_to_string(format!(".breathes/stderr/{file}"))?);
+        Err(std::io::Error::new(std::io::ErrorKind::Other, failure))
     }
+}
+
+fn main() -> ExitCode {
+    execute!(
+        std::io::stdout(),
+        crossterm::terminal::Clear(crossterm::terminal::ClearType::All),
+        crossterm::cursor::MoveTo(0, 1),
+    )
+    .expect("Fail to clear terminal");
+    create_dir_all(".breathes").expect("Fail to create .breathes directory");
+    create_dir_all(".breathes/stdout").expect("Fail to create .breathes/stdout directory");
+    create_dir_all(".breathes/stderr").expect("Fail to create .breathes/stderr directory");
+    if ok(
+        "checking format",
+        Command::new("cargo").arg("check").current_dir("."),
+        "source code respect code format standard",
+        "source code not respect code format standard",
+        "check.log",
+    )
+    .is_err()
+    {
+        eprintln!("Cargo check detect warning");
+        return ExitCode::FAILURE;
+    };
+    if ok(
+        "checking code format",
+        Command::new("cargo")
+            .arg("fmt")
+            .arg("--check")
+            .current_dir("."),
+        "source code respect code format standard",
+        "source code not respect code format standard",
+        "check.log",
+    )
+    .is_err()
+    {
+        eprintln!("Cargo fmt detect warning");
+        return ExitCode::FAILURE;
+    }
+    if ok(
+        "checking test",
+        Command::new("cargo")
+            .arg("test")
+            .arg("--no-fail-fast")
+            .current_dir("."),
+        "test success",
+        "test fail",
+        "test.log",
+    )
+    .is_err()
+    {
+        eprintln!("Cargo test detect warning");
+        return ExitCode::FAILURE;
+    }
+
+    if ok(
+        "checking clippy",
+        Command::new("cargo")
+            .arg("clippy")
+            .arg("--")
+            .arg("-D")
+            .arg("clippy:all")
+            .current_dir("."),
+        "No warning",
+        "Detect warning",
+        "clippy.log",
+    )
+    .is_err()
+    {
+        eprintln!("Cargo clippy detect warning");
+        return ExitCode::FAILURE;
+    }
+    if ok(
+        "generate documentation",
+        Command::new("cargo")
+            .arg("doc")
+            .arg("--no-deps")
+            .current_dir("."),
+        "documentation generated",
+        "documentation not generated",
+        "doc.log",
+    )
+    .is_err()
+    {
+        return ExitCode::FAILURE;
+    }
+    if ok(
+        "audit",
+        Command::new("cargo").arg("audit"),
+        "no vulnerabilities founded",
+        "vulnerabilities",
+        "audit.log",
+    )
+    .is_err()
+    {
+        eprintln!("Cargo audit detect warning");
+        return ExitCode::FAILURE;
+    }
+    println!();
+    ExitCode::SUCCESS
 }

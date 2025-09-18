@@ -9,4 +9,8 @@ categories = ["development-tools"]
 repository = "https://github.com/hackia/breath"
 keywords = ["mercurial", "rust", "commit"]
 readme = "README.md"
+
 [dependencies]
+crossterm = "0.29.0"
+inquire = { version = "0.9.1", features = ["editor"] }
+spinners = "4.1.1"
