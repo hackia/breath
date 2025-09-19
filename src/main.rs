@@ -1,5 +1,5 @@
 use crossterm::execute;
-use inquire::{Confirm, Editor, Select, Text};
+use inquire::{Confirm, Select, Text};
 use spinners::{Spinner, Spinners};
 use std::fs::{File, create_dir_all, read_to_string};
 use std::process::{Command, ExitCode};
@@ -28,15 +28,25 @@ fn ok(
     }
 }
 
-const COMMIT_MESSAGE: &str = r"%type%(%s%): %summary%
-
-%body%
-
-";
+const COMMIT_MESSAGE: &str = r"%type%(%s%): %summary%";
 
 fn diff() {
     Command::new("git")
+        .arg("status")
+        .status()
+        .expect("Fail to execute command");
+
+    ok(
+        "waiting",
+        &mut Command::new("sleep").arg("7"),
+        "waiting",
+        "waiting",
+        "waiting.log",
+    )
+    .expect("Fail to execute command");
+    Command::new("git")
         .arg("diff")
+        .arg("-p")
         .status()
         .expect("Fail to execute command");
 }
@@ -63,14 +73,9 @@ fn commit() -> ExitCode {
         let summary = Text::new("Commit summary")
             .prompt()
             .expect("failed to get summary");
-        let message = Editor::new("Commit message")
-            .prompt()
-            .expect("failed to get message");
-
         let comm = COMMIT_MESSAGE
             .replace("%type%", t)
             .replace("%s%", s.as_str())
-            .replace("%body%", message.as_str())
             .replace("%summary%", summary.as_str());
 
         Command::new("git")
