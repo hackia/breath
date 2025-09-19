@@ -35,13 +35,13 @@ formatting, tests, documentation, dependency audit and provides interactive comm
 ### Git support
 
 ```shell
-cargo install breath --features git
+cargo install breath --no-default-features --features git
 ```
 
 ### Mercurial support
 
 ```shell
-cargo install breath --features hg
+cargo install breath --no-default-features --features hg
 ```
 
 ### Hooks support
