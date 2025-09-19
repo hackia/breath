@@ -36,6 +36,8 @@ fn diff() {
         .status()
         .expect("Fail to execute command");
 
+    println!();
+
     ok(
         "waiting",
         &mut Command::new("sleep").arg("7"),
@@ -53,6 +55,7 @@ fn diff() {
 fn commit() -> ExitCode {
     println!();
     diff();
+    println!();
     if Confirm::new("Do you want commit this code ?")
         .with_default(false)
         .prompt()
@@ -132,7 +135,7 @@ fn main() -> ExitCode {
     )
     .is_err()
     {
-        eprintln!("Cargo check detect warning");
+        eprintln!(">>> Cargo check detect warning");
         return ExitCode::FAILURE;
     };
     if ok(
@@ -147,7 +150,7 @@ fn main() -> ExitCode {
     )
     .is_err()
     {
-        eprintln!("Cargo fmt detect warning");
+        eprintln!(">>> Cargo fmt detect warning");
         return ExitCode::FAILURE;
     }
     if ok(
@@ -162,7 +165,7 @@ fn main() -> ExitCode {
     )
     .is_err()
     {
-        eprintln!("Cargo test detect warning");
+        eprintln!(">>> Cargo test detect failures");
         return ExitCode::FAILURE;
     }
 
@@ -180,7 +183,7 @@ fn main() -> ExitCode {
     )
     .is_err()
     {
-        eprintln!("Cargo clippy detect warning");
+        eprintln!(">>> Cargo clippy detect warning");
         return ExitCode::FAILURE;
     }
     if ok(
@@ -195,6 +198,7 @@ fn main() -> ExitCode {
     )
     .is_err()
     {
+        eprintln!(">>> Cargo doc detect warning");
         return ExitCode::FAILURE;
     }
     if ok(
@@ -206,7 +210,7 @@ fn main() -> ExitCode {
     )
     .is_err()
     {
-        eprintln!("Cargo audit detect warning");
+        eprintln!(">>> cargo audit detect warning");
         return ExitCode::FAILURE;
     }
     commit()
