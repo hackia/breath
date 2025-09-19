@@ -98,6 +98,12 @@ fn commit() -> ExitCode {
             .prompt()
             .expect("failed to get confirm")
         {
+            execute!(
+                std::io::stdout(),
+                crossterm::terminal::Clear(crossterm::terminal::ClearType::All),
+                crossterm::cursor::MoveTo(0, 1)
+            )
+            .expect("error");
             Command::new("git")
                 .arg("push")
                 .arg("--all")
