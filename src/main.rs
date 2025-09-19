@@ -103,6 +103,7 @@ fn commit() -> ExitCode {
                 .arg("--all")
                 .status()
                 .expect("Fail to execute command");
+            println!();
             Command::new("git")
                 .arg("push")
                 .arg("--tags")
