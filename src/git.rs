@@ -1,4 +1,4 @@
-use crate::utils::{COMMIT_MESSAGE, ok, verify};
+use crate::utils::{COMMIT_MESSAGE, ok};
 use crossterm::execute;
 use inquire::{Confirm, Select, Text};
 use std::process::{Command, ExitCode};
@@ -44,7 +44,7 @@ fn diff() {
 
     ok(
         "waiting",
-        &mut Command::new("sleep").arg("7"),
+        Command::new("sleep").arg("7"),
         "waiting",
         "waiting",
         "waiting.log",
@@ -112,10 +112,12 @@ fn commit() -> ExitCode {
             .arg(".")
             .status()
             .expect("Fail to execute command");
-        let types = vec!["feat", "fix", "chore", "docs", "refactor", "style", "test"];
-        let t = Select::new("Commit types", types.to_vec())
-            .prompt()
-            .expect("failed to get scope");
+        let t = Select::new(
+            "Commit types",
+            vec!["feat", "fix", "chore", "docs", "refactor", "style", "test"],
+        )
+        .prompt()
+        .expect("failed to get scope");
         let s = Text::new("Commit scope")
             .prompt()
             .expect("failed to get scope");
@@ -181,6 +183,5 @@ fn commit() -> ExitCode {
 /// # Panics
 /// This function will panic if the `verify` function returns `false`, indicating that the required condition or state was not met.
 pub fn run() -> ExitCode {
-    assert!(verify());
     commit()
 }

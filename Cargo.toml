@@ -1,13 +1,13 @@
 [package]
 name = "breath"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2024"
 authors = ["hackia"]
 license = "AGPL-3.0"
-description = "a tools for commiting rust with git source code"
+description = "a tools for commiting rust with git or hg source code"
 categories = ["development-tools"]
 repository = "https://github.com/hackia/breath"
-keywords = ["git", "hg", "rust", "commit"]
+keywords = ["git", "hg", "rust", "Nodejs", "commit"]
 readme = "README.md"
 
 [dependencies]
@@ -16,6 +16,6 @@ inquire = { version = "0.9.1", features = ["editor"], optional = true }
 spinners = "4.1.1"
 
 [features]
-default = []
+default = ["git"]
 hg = ["inquire"]
 git = ["inquire"]
