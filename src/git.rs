@@ -118,16 +118,11 @@ fn commit() -> ExitCode {
             .iter()
             .map(|t| {
                 format!(
-                    "{} {} {} {} {}",
-                    t.type_name.to_string().replace(",", "").magenta().bold(),
-                    "~".white().italic().bold(),
-                    t.description
-                        .to_string()
-                        .replace(",", "")
-                        .dark_blue()
-                        .bold(),
-                    t.category.to_string().replace(",", "").magenta().bold(),
-                    t.mnemonic.to_string().replace(",", "").dark_blue().bold()
+                    "{} ~ {} ~ {} ~ {}",
+                    t.type_name.to_string().replace(",", ""),
+                    t.description.to_string().replace(",", ""),
+                    t.category.to_string().replace(",", ""),
+                    t.mnemonic.to_string().replace(",", ""),
                 )
             })
             .collect::<Vec<String>>();
@@ -145,14 +140,10 @@ fn commit() -> ExitCode {
         let comm = COMMIT_MESSAGE
             .replace(
                 "%type%",
-                y.first()
-                    .expect("failed to get type")
-                    .reset()
-                    .to_string()
-                    .as_str(),
+                y.first().expect("failed to get type").to_string().as_str(),
             )
-            .replace("%s%", s.reset().to_string().as_str())
-            .replace("%summary%", summary.reset().to_string().as_str());
+            .replace("%s%", s.to_string().as_str())
+            .replace("%summary%", summary.to_string().as_str());
         Command::new("git")
             .arg("commit")
             .arg("-m")
