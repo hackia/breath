@@ -138,12 +138,9 @@ fn commit() -> ExitCode {
             .expect("failed to get summary");
         let y = t.split("~").collect::<Vec<&str>>();
         let comm = COMMIT_MESSAGE
-            .replace(
-                "%type%",
-                y.first().expect("failed to get type").to_string().as_str(),
-            )
-            .replace("%s%", s.to_string().as_str())
-            .replace("%summary%", summary.to_string().as_str());
+            .replace("%type%", y.first().expect("failed to get type").trim_end())
+            .replace("%s%", s.trim_end())
+            .replace("%summary%", summary.trim_end());
         Command::new("git")
             .arg("commit")
             .arg("-m")
