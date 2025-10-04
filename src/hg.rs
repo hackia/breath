@@ -119,10 +119,12 @@ fn commit() -> ExitCode {
             .arg(".")
             .status()
             .expect("Fail to execute command");
-        let types = vec!["feat", "fix", "chore", "docs", "refactor", "style", "test"];
-        let t = Select::new("Commit types", types.to_vec())
-            .prompt()
-            .expect("failed to get scope");
+        let t = Select::new(
+            "Commit types",
+            vec!["feat", "fix", "chore", "docs", "refactor", "style", "test"],
+        )
+        .prompt()
+        .expect("failed to get scope");
         let s = Text::new("Commit scope")
             .prompt()
             .expect("failed to get scope");
@@ -165,7 +167,7 @@ fn commit() -> ExitCode {
         println!();
         ExitCode::SUCCESS
     } else {
-        println!("Abort commit");
+        println!("Commit aborted");
         ExitCode::SUCCESS
     }
 }
@@ -220,6 +222,5 @@ fn commit() -> ExitCode {
 /// - `verify`: Function must validate necessary conditions, returning a boolean.
 /// - `commit`: Function must perform the final operation and return an `ExitCode`.
 pub fn run() -> ExitCode {
-    assert!(verify());
     commit()
 }

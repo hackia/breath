@@ -1,5 +1,7 @@
+use crate::commit::COMMIT_TYPES;
 use crate::utils::{COMMIT_MESSAGE, ok};
 use crossterm::execute;
+use crossterm::style::Stylize;
 use inquire::{Confirm, Select, Text};
 use std::process::{Command, ExitCode};
 
@@ -112,23 +114,38 @@ fn commit() -> ExitCode {
             .arg(".")
             .status()
             .expect("Fail to execute command");
-        let t = Select::new(
-            "Commit types",
-            vec!["feat", "fix", "chore", "docs", "refactor", "style", "test"],
-        )
-        .prompt()
-        .expect("failed to get scope");
-        let s = Text::new("Commit scope")
+        let types = COMMIT_TYPES
+            .iter()
+            .map(|t| {
+                format!(
+                    "{} {} {} {} {}",
+                    t.type_name.to_string().replace(",", "").magenta().bold(),
+                    "~".white().italic().bold(),
+                    t.description
+                        .to_string()
+                        .replace(",", "")
+                        .dark_blue()
+                        .bold(),
+                    t.category.to_string().replace(",", "").magenta().bold(),
+                    t.mnemonic.to_string().replace(",", "").dark_blue().bold()
+                )
+            })
+            .collect::<Vec<String>>();
+        let t = Select::new("Commit types".green().bold().to_string().as_str(), types)
+            .with_vim_mode(true)
             .prompt()
             .expect("failed to get scope");
-        let summary = Text::new("Commit summary")
+        let s = Text::new("Commit scope".green().bold().to_string().as_str())
+            .prompt()
+            .expect("failed to get scope");
+        let summary = Text::new("Commit summary".green().bold().to_string().as_str())
             .prompt()
             .expect("failed to get summary");
+        let y = t.split("~").collect::<Vec<&str>>();
         let comm = COMMIT_MESSAGE
-            .replace("%type%", t)
+            .replace("%type%", y.first().expect(""))
             .replace("%s%", s.as_str())
             .replace("%summary%", summary.as_str());
-
         Command::new("git")
             .arg("commit")
             .arg("-m")
@@ -167,7 +184,7 @@ fn commit() -> ExitCode {
         println!();
         ExitCode::SUCCESS
     } else {
-        println!("Abort commit");
+        println!("Commit aborted");
         ExitCode::SUCCESS
     }
 }

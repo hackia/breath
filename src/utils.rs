@@ -1,5 +1,6 @@
-use crate::hooks::{Hooks, NODE_HOOKS, RUST_HOOKS};
-use crossterm::execute;
+use crate::hooks::{
+    CMAKE_HOOKS, CSHARP_HOOKS, GO_HOOKS, Hook, JAVA_HOOKS, NODE_HOOKS, PHP_HOOKS, RUST_HOOKS,
+};
 use spinners::{Spinner, Spinners};
 use std::fs::{File, create_dir_all, read_to_string};
 use std::path::{MAIN_SEPARATOR_STR, Path};
@@ -121,13 +122,7 @@ pub fn ok(
 /// - `crossterm` for terminal manipulation.
 /// - `cargo` commands for project verification.
 /// - Logs are written to the `.breathes ` directory for each respective check.
-pub fn verify(hooks: Vec<Hooks>) -> bool {
-    execute!(
-        std::io::stdout(),
-        crossterm::terminal::Clear(crossterm::terminal::ClearType::All),
-        crossterm::cursor::MoveTo(0, 1),
-    )
-    .expect("Fail to clear terminal");
+pub fn verify(hooks: Vec<Hook>) -> bool {
     create_dir_all(".breathes").expect("Fail to create .breathes directory");
     for hook in &hooks {
         create_dir_all(format!(".breathes{MAIN_SEPARATOR_STR}{}", hook.language))
@@ -146,6 +141,17 @@ pub fn verify(hooks: Vec<Hooks>) -> bool {
         let program = match hook.language {
             crate::hooks::Language::Node => "npm",
             crate::hooks::Language::Rust => "cargo",
+            crate::hooks::Language::Java => "mvn",
+            crate::hooks::Language::Python => "python",
+            crate::hooks::Language::Go => "go",
+            crate::hooks::Language::Php => "php",
+            crate::hooks::Language::Ruby => "ruby",
+            crate::hooks::Language::CMake => "cmake",
+            crate::hooks::Language::CSharp => "dotnet",
+            crate::hooks::Language::Kotlin => "gradlew",
+            crate::hooks::Language::Swift => "swift",
+            crate::hooks::Language::Dart => "dart",
+            crate::hooks::Language::Elixir => "elixir",
         };
 
         if ok(
@@ -167,7 +173,6 @@ pub fn verify(hooks: Vec<Hooks>) -> bool {
         )
             .is_err()
         {
-
             let one = read_to_string(format!(".breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stdout{MAIN_SEPARATOR_STR}{}", hook.language, hook.file));
             let two = read_to_string(format!(".breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stderr{MAIN_SEPARATOR_STR}{}", hook.language, hook.file));
             eprintln!("\n{}\n{}\n\n", one.expect("Fail to read file"),two.expect("Fail to read file"));
@@ -182,6 +187,21 @@ pub fn run_hooks() -> Result<(), std::io::Error> {
         return Err(std::io::Error::other("Some checks failed"));
     }
     if Path::new("package.json").exists() && verify(NODE_HOOKS.to_vec()).eq(&false) {
+        return Err(std::io::Error::other("Some checks failed"));
+    }
+    if Path::new("composer.json").exists() && verify(PHP_HOOKS.to_vec()).eq(&false) {
+        return Err(std::io::Error::other("Some checks failed"));
+    }
+    if Path::new("go.mod").exists() && verify(GO_HOOKS.to_vec()).eq(&false) {
+        return Err(std::io::Error::other("Some checks failed"));
+    }
+    if Path::new("*.csproj").exists() && verify(CSHARP_HOOKS.to_vec()).eq(&false) {
+        return Err(std::io::Error::other("Some checks failed"));
+    }
+    if Path::new("build.gradle").exists() && verify(JAVA_HOOKS.to_vec()).eq(&false) {
+        return Err(std::io::Error::other("Some checks failed"));
+    }
+    if Path::new("CMakeLists.txt").exists() && verify(CMAKE_HOOKS.to_vec()).eq(&false) {
         return Err(std::io::Error::other("Some checks failed"));
     }
     Ok(())

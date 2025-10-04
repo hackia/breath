@@ -4,15 +4,16 @@ compile_error!("Cannot enable both git and hg features");
 #[cfg(all(feature = "hg", feature = "git"))]
 compile_error!("Cannot enable both hg and git features");
 
-#[cfg(feature = "default")]
 #[cfg(feature = "git")]
 pub mod git;
 
 #[cfg(feature = "hg")]
 pub mod hg;
 
+mod commit;
 pub mod hooks;
 pub mod utils;
+
 use crate::utils::run_hooks;
 use std::process::ExitCode;
 #[cfg(feature = "git")]
