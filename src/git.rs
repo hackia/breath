@@ -1,8 +1,7 @@
-use crate::commit::COMMIT_TYPES;
-use crate::utils::{COMMIT_MESSAGE, ok};
+use crate::utils::{COMMIT_MESSAGE, ok, types};
 use crossterm::execute;
 use crossterm::style::Stylize;
-use inquire::{Confirm, Select, Text};
+use inquire::{Confirm, Editor, Select, Text};
 use std::process::{Command, ExitCode};
 
 /// Executes a series of shell commands related to Git and system operations.
@@ -114,19 +113,7 @@ fn commit() -> ExitCode {
             .arg(".")
             .status()
             .expect("Fail to execute command");
-        let types = COMMIT_TYPES
-            .iter()
-            .map(|t| {
-                format!(
-                    "{} ~ {} ~ {} ~ {}",
-                    t.type_name.to_string().replace(",", ""),
-                    t.description.to_string().replace(",", ""),
-                    t.category.to_string().replace(",", ""),
-                    t.mnemonic.to_string().replace(",", ""),
-                )
-            })
-            .collect::<Vec<String>>();
-        let t = Select::new("Commit types".green().bold().to_string().as_str(), types)
+        let t = Select::new("Commit types".green().bold().to_string().as_str(), types())
             .with_vim_mode(true)
             .prompt()
             .expect("failed to get scope");
@@ -136,11 +123,15 @@ fn commit() -> ExitCode {
         let summary = Text::new("Commit summary".green().bold().to_string().as_str())
             .prompt()
             .expect("failed to get summary");
-        let y = t.split("~").collect::<Vec<&str>>();
+        let body = Editor::new("enter the commit body: ")
+            .prompt()
+            .expect("failed to get body");
+        let y = t.split('~').collect::<Vec<&str>>();
         let comm = COMMIT_MESSAGE
             .replace("%type%", y.first().expect("failed to get type").trim_end())
             .replace("%s%", s.trim_end())
-            .replace("%summary%", summary.trim_end());
+            .replace("%summary%", summary.trim_end())
+            .replace("%body%", body.as_str());
         Command::new("git")
             .arg("commit")
             .arg("-m")
@@ -177,11 +168,10 @@ fn commit() -> ExitCode {
                 .expect("failed to execute command");
         }
         println!();
-        ExitCode::SUCCESS
-    } else {
-        println!("Commit aborted");
-        ExitCode::SUCCESS
+        return ExitCode::SUCCESS;
     }
+    println!("Commit aborted");
+    ExitCode::SUCCESS
 }
 /// Executes the primary operation of the program.
 ///
@@ -194,6 +184,7 @@ fn commit() -> ExitCode {
 ///
 /// # Panics
 /// This function will panic if the `verify` function returns `false`, indicating that the required condition or state was not met.
+#[must_use]
 pub fn run() -> ExitCode {
     commit()
 }

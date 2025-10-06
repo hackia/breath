@@ -1,6 +1,6 @@
-use crate::utils::{COMMIT_MESSAGE, ok, verify};
+use crate::utils::{COMMIT_MESSAGE, ok, types, verify};
 use crossterm::execute;
-use inquire::{Confirm, Select, Text};
+use inquire::{Confirm, Editor, Select, Text};
 use std::process::{Command, ExitCode};
 
 /// Executes a series of system commands to display version control status,
@@ -119,23 +119,24 @@ fn commit() -> ExitCode {
             .arg(".")
             .status()
             .expect("Fail to execute command");
-        let t = Select::new(
-            "Commit types",
-            vec!["feat", "fix", "chore", "docs", "refactor", "style", "test"],
-        )
-        .prompt()
-        .expect("failed to get scope");
+        let t = Select::new("Commit types", types())
+            .prompt()
+            .expect("failed to get scope");
         let s = Text::new("Commit scope")
             .prompt()
             .expect("failed to get scope");
         let summary = Text::new("Commit summary")
             .prompt()
             .expect("failed to get summary");
+        let body = Editor::new("enter the commit body: ")
+            .prompt()
+            .expect("failed to get body");
+        let y = t.split('~').collect::<Vec<&str>>();
         let comm = COMMIT_MESSAGE
-            .replace("%type%", t)
-            .replace("%s%", s.as_str())
-            .replace("%summary%", summary.as_str());
-
+            .replace("%type%", y.first().expect("failed to get type").trim_end())
+            .replace("%s%", s.trim_end())
+            .replace("%summary%", summary.trim_end())
+            .replace("%body%", body.as_str());
         Command::new("hg")
             .arg("commit")
             .arg("-m")
@@ -165,11 +166,10 @@ fn commit() -> ExitCode {
                 .expect("Fail to execute command");
         }
         println!();
-        ExitCode::SUCCESS
-    } else {
-        println!("Commit aborted");
-        ExitCode::SUCCESS
+        return ExitCode::SUCCESS;
     }
+    println!("Commit aborted");
+    ExitCode::SUCCESS
 }
 /// The `run` function is the entry point for executing a sequence of operations
 /// involved in the application's runtime execution.
@@ -221,6 +221,7 @@ fn commit() -> ExitCode {
 ///
 /// - `verify`: Function must validate necessary conditions, returning a boolean.
 /// - `commit`: Function must perform the final operation and return an `ExitCode`.
+#[must_use]
 pub fn run() -> ExitCode {
     commit()
 }

@@ -1,6 +1,5 @@
-use crate::hooks::{
-    CMAKE_HOOKS, CSHARP_HOOKS, GO_HOOKS, Hook, JAVA_HOOKS, NODE_HOOKS, PHP_HOOKS, RUST_HOOKS,
-};
+use crate::commit::COMMIT_TYPES;
+use crate::hooks::{CSHARP_HOOKS, GO_HOOKS, Hook, JAVA_HOOKS, NODE_HOOKS, PHP_HOOKS, RUST_HOOKS};
 use spinners::{Spinner, Spinners};
 use std::fs::{File, create_dir_all, read_to_string};
 use std::path::{MAIN_SEPARATOR_STR, Path};
@@ -32,6 +31,8 @@ use std::thread::sleep;
 ///   - `stderr/{file}`: Stores the standard error of the command.
 /// - If these files cannot be created or the command cannot be executed, the function panics with an appropriate error message.
 ///
+/// # Panics
+/// if command is not founded and if the process cannot be spawned.
 /// # Errors
 ///
 /// - Returns `Err(std::io::Error)` with the failure message if the command exits unsuccessfully.
@@ -80,6 +81,63 @@ pub fn ok(
     }
 }
 
+/// Returns a sorted list of formatted commit type strings.
+///
+/// This function operates on a predefined constant `COMMIT_TYPES`, which is assumed
+/// to be a collection of commit type objects. Each object contains the following fields:
+/// `type_name`, `description`, `category`, and `mnemonic`.
+///
+/// For each commit type object, the function generates a formatted string that concatenates
+/// its fields (`type_name`, `description`, `category`, and `mnemonic`), separated by ` ~ `.
+/// Additionally, any commas in the values of these fields are removed to ensure clean formatting.
+///
+/// The resulting list of formatted strings is sorted alphabetically before being returned.
+///
+/// # Returns
+/// * `Vec<String>` - A sorted vector of formatted commit type strings.
+///
+/// # Example
+/// Given the following `COMMIT_TYPES` structure:
+/// ```rust
+/// const COMMIT_TYPES: [CommitType; 2] = [
+///     CommitType {
+///         type_name: "feat",
+///         description: "A new feature",
+///         category: "Feature",
+///         mnemonic: "F",
+///     },
+///     CommitType {
+///         type_name: "fix",
+///         description: "A bug fix",
+///         category: "Bug Fix",
+///         mnemonic: "B",
+///     },
+/// ];
+/// ```
+/// Calling the `types` function will return:
+/// ```rust
+/// vec![
+///     "feat ~ A new feature ~ Feature ~ F",
+///     "fix ~ A bug fix ~ Bug Fix ~ B",
+/// ];
+/// ```
+#[must_use]
+pub fn types() -> Vec<String> {
+    let mut types = COMMIT_TYPES
+        .iter()
+        .map(|t| {
+            format!(
+                "{} ~ {} ~ {} ~ {}",
+                t.type_name.to_string().replace(',', ""),
+                t.description.to_string().replace(',', ""),
+                t.category.to_string().replace(',', ""),
+                t.mnemonic.to_string().replace(',', ""),
+            )
+        })
+        .collect::<Vec<String>>();
+    types.sort();
+    types
+}
 /// Verifies the quality, formatting, and security of a Rust project through a series of checks.
 ///
 /// This function performs the following tasks sequentially:
@@ -117,14 +175,21 @@ pub fn ok(
 /// }
 /// ```
 ///
+/// ### Errors
+/// - If there is an issue reading the command's stderr output.
+/// - If there is an issue executing a command.
+/// - If there is an issue creating a file.
+/// - If there is an issue clearing the terminal screen.
+/// - If there is an issue writing to a file.
 /// ### Dependencies
 ///
 /// - `crossterm` for terminal manipulation.
 /// - `cargo` commands for project verification.
 /// - Logs are written to the `.breathes ` directory for each respective check.
-pub fn verify(hooks: Vec<Hook>) -> bool {
+#[must_use]
+pub fn verify(hooks: &[Hook]) -> bool {
     create_dir_all(".breathes").expect("Fail to create .breathes directory");
-    for hook in &hooks {
+    for hook in hooks {
         create_dir_all(format!(".breathes{MAIN_SEPARATOR_STR}{}", hook.language))
             .expect("Fail to create .breathes/out_dir directory");
         create_dir_all(format!(
@@ -175,35 +240,132 @@ pub fn verify(hooks: Vec<Hook>) -> bool {
         {
             let one = read_to_string(format!(".breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stdout{MAIN_SEPARATOR_STR}{}", hook.language, hook.file));
             let two = read_to_string(format!(".breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stderr{MAIN_SEPARATOR_STR}{}", hook.language, hook.file));
-            eprintln!("\n{}\n{}\n\n", one.expect("Fail to read file"),two.expect("Fail to read file"));
+            eprintln!("\n{}\n{}\n\n", one.expect("Fail to read file"), two.expect("Fail to read file"));
             return false;
-        };
+        }
     }
     true
 }
 
+/// Runs a set of predefined checks or hooks depending on the existence of certain project configuration files.
+///
+/// This function is designed to verify the presence of specific dependencies, configurations, or workflows
+/// for common programming environments
+/// Each environment has its respective hooks validated.
+///
+/// # Returns
+///
+/// * `Ok(())` if all checks pass successfully.
+/// * `Err(std::io::Error)` if one or more checks fail.
+///
+/// # Hook Logic for Each Environment:
+///
+/// 1. `Rust`: If a `Cargo.toml` file exists, runs the `RUST_HOOKS` verification.
+///    Returns an error if the checks fail.
+///
+/// 2. `Node.js`: If a `package.json` file exists, runs the `NODE_HOOKS` verification.
+///    Returns an error if the checks fail.
+///
+/// 3. `PHP`: If a `composer.json` file exists, runs the `PHP_HOOKS` verification.
+///    Returns an error if the checks fail.
+///
+/// 4. `Go`: If a `go.mod` file exists, runs the `GO_HOOKS` verification.
+///    Returns an error if the checks fail.
+///
+/// 5. `C#`: If a `.csproj` file exists, runs the `CSHARP_HOOKS` verification.
+///    Returns an error if the checks fail.
+///
+/// 6. `Java`: If a `build.gradle` file exists, runs the `JAVA_HOOKS` verification.
+///    Returns an error if the checks fail.
+///
+/// 7. `CMake`: If a `CMakeLists.txt` file exists:
+///     - Runs `cmake` to configure the project.
+///     - Runs `make` to build the project.
+///     - Runs `make test` to execute tests.
+///
+/// If any of these commands fail, an error is returned indicating that the `CMake`
+///     configuration validation failed.
+///
+/// # Error Handling
+/// In all cases, if a required hook verification or command fails, an error of type
+/// `std::io::Error` with a custom message is returned to indicate which step or
+/// environment failed.
+///
+/// # Examples
+///
+/// ```rust
+/// match run_hooks() {
+///     Ok(_) => println!("All hooks passed successfully."),
+///     Err(err) => eprintln!("A hook check failed: {err}"),
+/// }
+/// ```
+///
+/// # Panics
+/// This function may panic if external commands (like `cmake` or `make`) fail to spawn or
+/// if their processes terminate unexpectedly.
+/// # Errors
+/// If some hooks failed
+/// # Dependencies
+/// - This function assumes that tools like `cmake` and `make` are installed and available
+///   in the system's `PATH` if a CMake-based build system is being validated.
+///
+/// # Notes
+/// - The `verify` function and various `*_HOOKS` constants are used internally for hook validation.
+///   These must be defined appropriately outside the scope of this function.
+/// - The function performs validation by matching file paths at the root of the project. Ensure
+///   the function is executed in the appropriate working directory.
+///
 pub fn run_hooks() -> Result<(), std::io::Error> {
-    if Path::new("Cargo.toml").exists() && verify(RUST_HOOKS.to_vec()).eq(&false) {
+    if Path::new("Cargo.toml").exists() && verify(&RUST_HOOKS).eq(&false) {
         return Err(std::io::Error::other("Some checks failed"));
     }
-    if Path::new("package.json").exists() && verify(NODE_HOOKS.to_vec()).eq(&false) {
+    if Path::new("package.json").exists() && verify(&NODE_HOOKS).eq(&false) {
         return Err(std::io::Error::other("Some checks failed"));
     }
-    if Path::new("composer.json").exists() && verify(PHP_HOOKS.to_vec()).eq(&false) {
+    if Path::new("composer.json").exists() && verify(&PHP_HOOKS).eq(&false) {
         return Err(std::io::Error::other("Some checks failed"));
     }
-    if Path::new("go.mod").exists() && verify(GO_HOOKS.to_vec()).eq(&false) {
+    if Path::new("go.mod").exists() && verify(&GO_HOOKS).eq(&false) {
         return Err(std::io::Error::other("Some checks failed"));
     }
-    if Path::new("*.csproj").exists() && verify(CSHARP_HOOKS.to_vec()).eq(&false) {
+    if Path::new(".csproj").exists() && verify(&CSHARP_HOOKS).eq(&false) {
         return Err(std::io::Error::other("Some checks failed"));
     }
-    if Path::new("build.gradle").exists() && verify(JAVA_HOOKS.to_vec()).eq(&false) {
+    if Path::new("build.gradle").exists() && verify(&JAVA_HOOKS).eq(&false) {
         return Err(std::io::Error::other("Some checks failed"));
     }
-    if Path::new("CMakeLists.txt").exists() && verify(CMAKE_HOOKS.to_vec()).eq(&false) {
-        return Err(std::io::Error::other("Some checks failed"));
+    if Path::new("CMakeLists.txt").exists()
+        && Command::new("cmake")
+            .arg(".")
+            .current_dir(".")
+            .spawn()
+            .expect("failed")
+            .wait()
+            .expect("failed")
+            .success()
+            .eq(&false)
+        && Command::new("make")
+            .current_dir(".")
+            .spawn()
+            .expect("failed")
+            .wait()
+            .expect("failed")
+            .success()
+            .eq(&false)
+        && Command::new("make")
+            .arg("test")
+            .current_dir(".")
+            .spawn()
+            .expect("failed")
+            .wait()
+            .expect("failed")
+            .success()
+            .eq(&false)
+    {
+        return Err(std::io::Error::other(
+            "Cmake configuration validation failed",
+        ));
     }
     Ok(())
 }
-pub const COMMIT_MESSAGE: &str = r"%type%(%s%): %summary%";
+pub const COMMIT_MESSAGE: &str = r"%type%(%s%): %summary%\n\n%body%";

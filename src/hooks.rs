@@ -20,19 +20,19 @@ pub enum Language {
 impl Display for Language {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Language::Node => write!(f, "Node"),
-            Language::Rust => write!(f, "Rust"),
-            Language::Java => write!(f, "Java"),
-            Language::Python => write!(f, "Python"),
-            Language::Go => write!(f, "Go"),
-            Language::Php => write!(f, "Php"),
-            Language::Ruby => write!(f, "Ruby"),
-            Language::CMake => write!(f, "CMake"),
-            Language::CSharp => write!(f, "Csharp"),
-            Language::Kotlin => write!(f, "Kotlin"),
-            Language::Swift => write!(f, "Swift"),
-            Language::Dart => write!(f, "Dart"),
-            Language::Elixir => write!(f, "Elixir"),
+            Self::Node => write!(f, "Node"),
+            Self::Rust => write!(f, "Rust"),
+            Self::Java => write!(f, "Java"),
+            Self::Python => write!(f, "Python"),
+            Self::Go => write!(f, "Go"),
+            Self::Php => write!(f, "Php"),
+            Self::Ruby => write!(f, "Ruby"),
+            Self::CMake => write!(f, "CMake"),
+            Self::CSharp => write!(f, "Csharp"),
+            Self::Kotlin => write!(f, "Kotlin"),
+            Self::Swift => write!(f, "Swift"),
+            Self::Dart => write!(f, "Dart"),
+            Self::Elixir => write!(f, "Elixir"),
         }
     }
 }
@@ -178,7 +178,7 @@ pub const CMAKE_HOOKS: [Hook; 1] = [Hook {
     success: "CMake configuration is valid",
     failure: "CMake configuration validation failed",
     file: "cmake-validate.log",
-    command: "build . && make . && make test",
+    command: "cmake . && make && make test",
 }];
 
 pub const PHP_HOOKS: [Hook; 4] = [
@@ -258,7 +258,7 @@ pub const RUST_HOOKS: [Hook; 5] = [
         success: "No issues found",
         failure: "Clippy checks found issues",
         file: "clippy.log",
-        command: "clippy -- -D clippy::all -D warnings",
+        command: "clippy -- -D clippy::all -W warnings -D clippy::pedantic -D clippy::nursery -A clippy::multiple_crate_versions -W clippy::cargo",
     },
     Hook {
         language: Language::Rust,
