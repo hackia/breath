@@ -131,11 +131,11 @@ fn commit() -> ExitCode {
             .replace("%type%", y.first().expect("failed to get type").trim_end())
             .replace("%s%", s.trim_end())
             .replace("%summary%", summary.trim_end())
-            .replace("%body%", body.as_str());
+            .replace("%body%", body.trim_end());
         Command::new("git")
             .arg("commit")
             .arg("-m")
-            .arg(comm)
+            .arg(comm.as_str())
             .status()
             .expect("Fail to execute command");
         execute!(
