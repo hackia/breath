@@ -1,5 +1,6 @@
 use crate::commit::COMMIT_TYPES;
 use crate::hooks::{CSHARP_HOOKS, GO_HOOKS, Hook, JAVA_HOOKS, NODE_HOOKS, PHP_HOOKS, RUST_HOOKS};
+use inquire::Text;
 use spinners::{Spinner, Spinners};
 use std::fs::{File, create_dir_all, read_to_string};
 use std::path::{MAIN_SEPARATOR_STR, Path};
@@ -368,4 +369,88 @@ pub fn run_hooks() -> Result<(), std::io::Error> {
     }
     Ok(())
 }
+
+/// Configures Git with global settings for username, email, and editor.
+///
+/// This function uses the command-line `git config` utility to set the global
+/// Git configuration values for `user.name`, `user.email`, and `core.editor`.
+/// Each configuration value is provided interactively by prompting the user
+/// for input.
+///
+/// # Steps
+/// - Prompts the user for their Git username and sets it using `git config --global user.name`.
+/// - Prompts the user for their Git email and sets it using `git config --global user.email`.
+/// - Prompts the user for their preferred text editor and sets it using `git config --global core.editor`.
+///
+/// # Panics
+/// - If any of the configuration commands fail to execute or if the user input prompt fails.
+/// # Returns
+/// Returns `true` if all three configuration commands complete successfully,
+/// and `false` if any of the commands fail.
+///
+/// # Errors
+/// This function will panic if:
+/// - A username, email, or editor cannot be successfully retrieved from the user input prompt.
+/// - A command to configure one of the settings with Git fails to spawn, wait, or execute.
+///
+/// # Must Use
+/// This function is annotated with `#[must_use]` to ensure that callers handle
+/// the result (e.g., to confirm whether the configuration was successful).
+///
+/// # Example
+/// ```
+/// if configure_git() {
+///     println!("Git successfully configured!");
+/// } else {
+///     eprintln!("Failed to configure Git.");
+/// }
+/// ```
+///
+/// # Dependencies
+/// This function relies on external command execution and requires that:
+/// - The `git` command-line tool is installed and available in the system's PATH.
+/// - The `prompt` functionality (likely provided by the `Text` crate or input handler) is implemented and operational.
+#[must_use]
+pub fn configure_git() -> bool {
+    Command::new("git")
+        .arg("config")
+        .arg("--global")
+        .arg("user.name")
+        .arg(
+            Text::new("username")
+                .prompt()
+                .expect("failed to get username"),
+        )
+        .spawn()
+        .expect("failed")
+        .wait()
+        .expect("failed")
+        .success()
+        && Command::new("git")
+            .arg("config")
+            .arg("--global")
+            .arg("user.email")
+            .arg(Text::new("email").prompt().expect("failed to get email"))
+            .spawn()
+            .expect("failed")
+            .wait()
+            .expect("failed")
+            .success()
+        && Command::new("git")
+            .arg("config")
+            .arg("--global")
+            .arg("core.editor")
+            .arg(Text::new("editor").prompt().expect("failed to get editor"))
+            .spawn()
+            .expect("failed")
+            .wait()
+            .expect("failed")
+            .success()
+}
 pub const COMMIT_MESSAGE: &str = r"%type%(%s%): %summary%\n\n%body%";
+
+#[must_use]
+pub fn configure_hg() -> bool {
+    println!("run command hg config --edit manually");
+    true
+}

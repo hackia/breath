@@ -1,4 +1,4 @@
-use crate::utils::{COMMIT_MESSAGE, ok, types, verify};
+use crate::utils::{COMMIT_MESSAGE, ok, run_hooks, types};
 use crossterm::execute;
 use inquire::{Confirm, Editor, Select, Text};
 use std::process::{Command, ExitCode};
@@ -46,7 +46,7 @@ fn diff() {
 
     ok(
         "waiting",
-        &mut Command::new("sleep").arg("7"),
+        Command::new("sleep").arg("7"),
         "waiting",
         "waiting",
         "waiting.log",
@@ -223,5 +223,8 @@ fn commit() -> ExitCode {
 /// - `commit`: Function must perform the final operation and return an `ExitCode`.
 #[must_use]
 pub fn run() -> ExitCode {
+    if run_hooks().is_err() {
+        return ExitCode::FAILURE;
+    }
     commit()
 }

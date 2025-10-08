@@ -1,4 +1,4 @@
-use crate::utils::{COMMIT_MESSAGE, ok, types};
+use crate::utils::{COMMIT_MESSAGE, ok, run_hooks, types};
 use crossterm::execute;
 use crossterm::style::Stylize;
 use inquire::{Confirm, Editor, Select, Text};
@@ -186,5 +186,8 @@ fn commit() -> ExitCode {
 /// This function will panic if the `verify` function returns `false`, indicating that the required condition or state was not met.
 #[must_use]
 pub fn run() -> ExitCode {
+    if run_hooks().is_err() {
+        return ExitCode::FAILURE;
+    }
     commit()
 }
