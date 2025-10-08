@@ -4,11 +4,11 @@
 [![Crates.io](https://img.shields.io/crates/v/breath.svg)](https://crates.io/crates/breath)
 
 A fast, interactive CLI that streamlines committing code to Git or Mercurial repositories.
-It can also run language-aware pre-commit checks (format, lint, tests, security, deps) and stores
+It can also run language-aware checks before you commit (format, lint, tests, security, deps) and stores
 logs per language under a .breathes directory.
 
-Note on features: this binary is built with Cargo features to target a VCS. The default feature is git.
-You must not enable both features at once (the build will fail): --features git OR --features hg.
+VCS detection: Breath auto-detects the repository type at runtime by checking for .git or .hg.
+No Cargo features are required to switch between Git and Mercurial.
 
 | Category                      | Commit Type                | Mnemonic                                                                                           | Description                                              | Example                                                                               |
 |-------------------------------|----------------------------|----------------------------------------------------------------------------------------------------|----------------------------------------------------------|---------------------------------------------------------------------------------------|
@@ -83,15 +83,15 @@ Under the hood it uses:
 - Language: Rust (edition 2024)
 - Package manager/build tool: Cargo
 - Binary crate name: breath
-- Entry point: src/main.rs (conditional on features)
-  - Default build includes the git module
-  - --features hg switches the entry to the hg module
+- Entry point: src/main.rs
+- VCS: auto-detected at runtime by checking for .git or .hg
+- Subcommands: config, health, commit, push, pull, status, log, diff
 
 ## Requirements
 - Rust toolchain with edition 2024 support (Rust 1.82+ recommended)
-- One of:
-  - Git (for git feature)
-  - Mercurial/hg (for hg feature)
+- One of (depending on your repository):
+  - Git (if using a Git repo)
+  - Mercurial/hg (if using a Mercurial repo)
 - Optional tools used by hooks (only needed if the corresponding project files exist):
   - Rust: rustfmt, clippy (rustup components), cargo-audit, cargo-outdated
   - Node.js: npm
@@ -105,46 +105,50 @@ If a language’s tool is not installed but its marker file exists (e.g., Cargo.
 
 ## Installation
 
-From crates.io (default: Git feature):
+From crates.io:
 
 ```sh
 cargo install breath
 ```
 
-Build explicitly for Git or Mercurial:
-
-```sh
-# Git (explicit)
-cargo install breath --no-default-features --features git
-
-# Mercurial
-cargo install breath --no-default-features --features hg
-```
-
 From source (in this repo):
 
 ```sh
-# Git (default)
 cargo build --release
-
-# Mercurial
-cargo build --release --no-default-features --features hg
 ```
 
 ## Usage
 
-Interactive commit flow (Git default):
+Breath works the same in Git and Mercurial repositories. It auto-detects the VCS.
+
+- Interactive commit flow:
 
 ```sh
-breath
+breath commit
+# or simply `breath` to run the default interactive flow (commit in detected VCS)
 ```
 
-Run the Mercurial build:
+- Health checks (run language-aware hooks if their marker files exist):
 
 ```sh
-breath  # if you installed with --features hg
-# or, from source without installing:
-cargo run --no-default-features --features hg
+breath health
+```
+
+- Configure your Git or Mercurial setup:
+
+```sh
+breath config git  # prompts for user.name, user.email, core.editor
+breath config hg   # prints instructions to edit hg config
+```
+
+- Convenience passthroughs to the underlying VCS:
+
+```sh
+breath status
+breath log
+breath diff
+breath push
+breath pull
 ```
 
 Example pre-commit hook:
@@ -170,11 +174,10 @@ Breath runs language-specific hooks based on the presence of well-known files in
 Outputs are stored under .breathes/<Language>/{stdout,stderr}/<hook>.log. On failure, Breath prints the captured logs for quick diagnosis.
 
 ## Scripts and common commands
-- Build (default/git): cargo build --release
-- Build (hg): cargo build --release --no-default-features --features hg
-- Run (default/git): cargo run
-- Run (hg): cargo run --no-default-features --features hg
-- Install locally: cargo install --path .
+- Build: cargo build --release
+- Run: cargo run
+- Install locally from source: cargo install --path .
+- Show help: breath --help
 
 ## Environment variables
 - None required at this time.
@@ -189,14 +192,14 @@ Outputs are stored under .breathes/<Language>/{stdout,stderr}/<hook>.log. On fai
 
 ```
 .
-├── Cargo.toml           # crate metadata, features (default = ["git"]) 
+├── Cargo.toml           # crate metadata (name, version, license, deps)
 ├── src
-│   ├── main.rs          # feature-gated entry (git or hg)
+│   ├── main.rs          # CLI entry point and subcommands; auto-detects Git/Hg
 │   ├── git.rs           # Git workflow: diff, commit, optional push
 │   ├── hg.rs            # Mercurial workflow: diff, commit, optional push
 │   ├── utils.rs         # hooks runner, spinner UI, COMMIT_MESSAGE template
 │   ├── hooks.rs         # per-language hook definitions
-│   └── commit.rs        # commit type catalogue for the Git flow
+│   └── commit.rs        # commit type catalogue for the interactive menu
 ├── README.md
 └── target/              # build artifacts (ignored)
 ```
