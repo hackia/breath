@@ -382,14 +382,12 @@ impl Zen {
             let body = Editor::new("Explain changes:")
                 .prompt()
                 .expect("failed to get body");
-
             let y = t.split('~').collect::<Vec<&str>>();
             let msg = COMMIT_MESSAGE
                 .replace("%type%", y.first().expect("").trim_end())
                 .replace("%summary%", summary.trim_end())
                 .replace("%body%", body.as_str());
-
-            println!("{msg}");
+            println!("\n{msg}\n");
             if Confirm::new("Use this commit message")
                 .with_default(true)
                 .prompt()
