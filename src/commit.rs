@@ -400,7 +400,7 @@ impl Zen {
             if t.is_empty() || summary.is_empty() || body.is_empty() {
                 continue;
             }
-            return commit(msg.as_str());
+            return commit(format!("\n{msg}\n").as_str());
         }
     }
 }
