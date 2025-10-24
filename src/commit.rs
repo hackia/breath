@@ -1,4 +1,4 @@
-use crate::utils::{COMMIT_MESSAGE, run_hooks, types};
+use crate::utils::{run_hooks, types};
 use crossterm::style::Stylize;
 use inquire::{Confirm, Editor, Select, Text};
 use std::path::Path;
@@ -360,14 +360,17 @@ impl Zen {
                 .prompt()
                 .expect("failed to get body");
             let y = t.split('~').collect::<Vec<&str>>();
-            x.push_str(
-                COMMIT_MESSAGE
-                    .replace("%type%", y.first().expect("").trim_end())
-                    .replace("%summary%", summary.trim_end())
-                    .replace("%body%", body.as_str())
-                    .as_str(),
-            );
+            x.push_str(y.first().expect("failed to get type").trim_end());
+            x.push(' ');
+            x.push_str(summary.trim_end());
 
+            let lines = body.split('\n').collect::<Vec<&str>>();
+
+            for line in lines {
+                x.push('\n');
+                x.push_str(line);
+            }
+            x.push('\n');
             if Confirm::new(x.as_str())
                 .with_default(false)
                 .prompt()
