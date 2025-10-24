@@ -1,8 +1,6 @@
 use crate::utils::{run_hooks, types};
 use crossterm::style::Stylize;
 use inquire::{Confirm, Editor, Select, Text};
-use std::fs::{File, read_to_string, remove_file};
-use std::io::Write;
 use std::path::Path;
 use std::process::{Command, ExitCode};
 #[derive(Debug)]
@@ -337,6 +335,27 @@ fn diff() {
         );
     }
 }
+
+fn commit(msg: &str) -> ExitCode {
+    if Command::new(vcs())
+        .arg("commit")
+        .arg("-m")
+        .arg(msg)
+        .current_dir(".")
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap()
+        .success()
+    {
+        ExitCode::SUCCESS
+    } else {
+        eprintln!("failed to run commit");
+        ExitCode::FAILURE
+    }
+}
+pub const COMMIT_MESSAGE: &str = "%type%: %summary%\n\n%body%\n";
+
 pub struct Zen;
 impl Zen {
     ///
@@ -365,57 +384,25 @@ impl Zen {
                 .expect("failed to get body");
 
             let y = t.split('~').collect::<Vec<&str>>();
+            let msg = COMMIT_MESSAGE
+                .replace("%type%", y.first().expect("").trim_end())
+                .replace("%summary%", summary.trim_end())
+                .replace("%body%", body.as_str());
 
-            let mut cmt = File::create("commit").expect("failed to create file");
-
-            assert!(
-                writeln!(
-                    cmt,
-                    "{}",
-                    format!(
-                        "{}: {summary}\n",
-                        y.first().expect("failed to get type").trim_end()
-                    )
-                    .as_str()
-                )
-                .is_ok()
-            );
-            assert!(writeln!(cmt, "\n{body}\n").is_ok());
-            if Confirm::new(
-                read_to_string("commit")
-                    .expect("failed to parse file")
-                    .as_str(),
-            )
-            .with_default(false)
-            .prompt()
-            .expect("failed to get if ")
-            .eq(&false)
+            println!("{msg}");
+            if Confirm::new("Use this commit message")
+                .with_default(true)
+                .prompt()
+                .expect("failed to get if ")
+                .eq(&false)
             {
-                remove_file("commit").expect("failed to remove tmp file");
                 println!("aborted commit");
                 return ExitCode::SUCCESS;
             }
             if t.is_empty() || summary.is_empty() || body.is_empty() {
                 continue;
             }
-            break;
-        }
-        if Command::new(vcs())
-            .arg("commit")
-            .arg("-m")
-            .arg(read_to_string("commit").expect("failed to get commit content"))
-            .current_dir(".")
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap()
-            .success()
-        {
-            remove_file("commit").expect("failed to remove file");
-            ExitCode::SUCCESS
-        } else {
-            eprintln!("failed to run commit");
-            ExitCode::FAILURE
+            return commit(msg.as_str());
         }
     }
 }
