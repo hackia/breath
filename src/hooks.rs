@@ -1,6 +1,6 @@
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone)]
+#[derive(Clone, Hash, Eq, PartialEq)]
 pub enum Language {
     Node,
     Rust,
@@ -137,7 +137,7 @@ pub const GO_HOOKS: [Hook; 5] = [
         success: "Code formatting is correct",
         failure: "Code formatting issues found",
         file: "gofmt.log",
-        command: "fmt -x",
+        command: "fmt",
     },
     Hook {
         language: Language::Go,
@@ -145,7 +145,7 @@ pub const GO_HOOKS: [Hook; 5] = [
         success: "Tests passed",
         failure: "Tests failed",
         file: "test.log",
-        command: "test ./...",
+        command: "test -v",
     },
     Hook {
         language: Language::Go,
@@ -153,7 +153,7 @@ pub const GO_HOOKS: [Hook; 5] = [
         success: "No issues found",
         failure: "Static analysis issues found",
         file: "lint.log",
-        command: "vet ./...",
+        command: "vet",
     },
     Hook {
         language: Language::Go,
@@ -181,30 +181,38 @@ pub const CMAKE_HOOKS: [Hook; 1] = [Hook {
     command: "cmake . && make && make test",
 }];
 
-pub const PHP_HOOKS: [Hook; 4] = [
+pub const PHP_HOOKS: [Hook; 5] = [
+    Hook {
+        language: Language::Php,
+        description: "Checks that your PHP and extensions versions match the platform requirements of the installed packages.",
+        success: "No missing requirements on your system",
+        failure: "Mising requirements in your system",
+        file: "check-platform-reqs.log",
+        command: "check-platform-reqs",
+    },
     Hook {
         language: Language::Php,
         description: "Checks for outdated packages in your PHP project.",
-        success: "No outdated packages found",
-        failure: "Outdated packages found",
-        command: "outdated",
-        file: "outdated.log",
+        success: "Composer file is valid",
+        failure: "Composer file is not valid",
+        command: "validate",
+        file: "validate.log",
     },
     Hook {
         language: Language::Php,
         description: "Checks for security vulnerabilities in your PHP dependencies.",
-        success: "No security vulnerabilities found",
-        failure: "Security vulnerabilities found",
-        command: "security-check",
-        file: "security.log",
+        success: "No vulnerabilities has been founded",
+        failure: "Vulnerabilities has been founded",
+        command: "audit",
+        file: "audit.log",
     },
     Hook {
         language: Language::Php,
-        description: "Checks for formatting issues in your PHP code.",
-        success: "No formatting issues found",
-        failure: "Formatting issues found",
-        command: "php-cs-fixer fix --dry-run --diff",
-        file: "php-cs-fixer.log",
+        description: "Checks outdated packages.",
+        success: "No outdated packages found",
+        failure: "Outdated packages founded",
+        command: "outdated",
+        file: "outdated.log",
     },
     Hook {
         language: Language::Php,
@@ -216,7 +224,7 @@ pub const PHP_HOOKS: [Hook; 4] = [
     },
 ];
 
-pub const NODE_HOOKS: [Hook; 2] = [
+pub const NODE_HOOKS: [Hook; 3] = [
     Hook {
         language: Language::Node,
         description: "Checks for outdated packages in your Node.js project.",
@@ -233,14 +241,38 @@ pub const NODE_HOOKS: [Hook; 2] = [
         file: "test.log",
         command: "run test",
     },
+    Hook {
+        language: Language::Node,
+        description: "Auditing your NodeJs project.",
+        success: "No vulnerabilities founded",
+        failure: "Vulnerabilities founded",
+        file: "audit.log",
+        command: "audit",
+    },
 ];
 
-pub const RUST_HOOKS: [Hook; 5] = [
+pub const RUST_HOOKS: [Hook; 7] = [
     Hook {
         language: Language::Rust,
         description: "Checks for security vulnerabilities in your Rust dependencies.",
-        success: "no vulnerabilities found",
-        failure: "vulnerabilities found",
+        success: "Project is valid",
+        failure: "Project not valid",
+        file: "project.log",
+        command: "verify-project",
+    },
+    Hook {
+        language: Language::Rust,
+        description: "Checks build capability for dependencies.",
+        success: "Can build the project",
+        failure: "Cargo check detect failure",
+        file: "check.log",
+        command: "check",
+    },
+    Hook {
+        language: Language::Rust,
+        description: "Checks for security vulnerabilities in your Rust dependencies.",
+        success: "No vulnerabilities found",
+        failure: "Vulnerabilities found",
         file: "audit.log",
         command: "audit",
     },
@@ -248,15 +280,15 @@ pub const RUST_HOOKS: [Hook; 5] = [
         language: Language::Rust,
         description: "Checks for formatting issues in your Rust code.",
         file: "fmt.log",
-        success: "format respect standard",
-        failure: "format not respect standard",
+        success: "Respect the code format standard",
+        failure: "Not respect code format standard",
         command: "fmt --check",
     },
     Hook {
         language: Language::Rust,
         description: "Checks for linting issues and suggests code improvements.",
         success: "No issues found",
-        failure: "Clippy checks found issues",
+        failure: "Lint founded some warnings",
         file: "clippy.log",
         command: "clippy -- -D clippy::all -W warnings -D clippy::pedantic -D clippy::nursery -A clippy::multiple_crate_versions -W clippy::cargo",
     },

@@ -1,11 +1,19 @@
 use crate::commit::COMMIT_TYPES;
-use crate::hooks::{CSHARP_HOOKS, GO_HOOKS, Hook, JAVA_HOOKS, NODE_HOOKS, PHP_HOOKS, RUST_HOOKS};
+use crate::hooks::Language::{
+    CMake, CSharp, Dart, Elixir, Go, Java, Kotlin, Node, Php, Python, Ruby, Rust, Swift,
+};
+use crate::hooks::{
+    CSHARP_HOOKS, GO_HOOKS, Hook, JAVA_HOOKS, Language, NODE_HOOKS, PHP_HOOKS, RUST_HOOKS,
+};
+use crossterm::style::Stylize;
 use inquire::Text;
 use spinners::{Spinner, Spinners};
-use std::fs::{File, create_dir_all, read_to_string};
+use std::collections::HashMap;
+use std::fs::{File, create_dir_all};
+use std::io::Error;
 use std::path::{MAIN_SEPARATOR_STR, Path};
 use std::process::Command;
-use std::thread::sleep;
+use tabled::settings::Style;
 
 /// Executes a command and provides real-time visual feedback while processing.
 ///
@@ -56,13 +64,7 @@ use std::thread::sleep;
 ///     )
 /// }
 /// ```
-pub fn ok(
-    message: &str,
-    cmd: &mut Command,
-    success: &str,
-    failure: &str,
-    file: &str,
-) -> std::io::Result<()> {
+pub fn ok(message: &str, cmd: &mut Command, success: &str, failure: &str) -> std::io::Result<()> {
     let mut output = Spinner::new(Spinners::Dots2, message.to_string());
     let status = cmd
         .current_dir(".")
@@ -72,13 +74,12 @@ pub fn ok(
         .expect("fail to wait for thread")
         .code()
         .expect("fail to get exit code");
-    sleep(std::time::Duration::from_millis(250));
     if status.eq(&0) {
-        output.stop_and_persist("*", success.to_string());
+        output.stop_and_persist("✓".green().to_string().as_str(), success.blue().to_string());
         Ok(())
     } else {
-        output.stop_and_persist("!", read_to_string(format!(".breathes/stderr/{file}"))?);
-        Err(std::io::Error::other(failure))
+        output.stop_and_persist("!".red().to_string().as_str(), message.yellow().to_string());
+        Err(Error::other(failure))
     }
 }
 
@@ -190,6 +191,7 @@ pub fn types() -> Vec<String> {
 #[must_use]
 pub fn verify(hooks: &[Hook]) -> bool {
     create_dir_all(".breathes").expect("Fail to create .breathes directory");
+    let mut status: Vec<bool> = Vec::new();
     for hook in hooks {
         create_dir_all(format!(".breathes{MAIN_SEPARATOR_STR}{}", hook.language))
             .expect("Fail to create .breathes/out_dir directory");
@@ -205,19 +207,19 @@ pub fn verify(hooks: &[Hook]) -> bool {
         .expect("Fail to create .breathes/out_dir directory");
 
         let program = match hook.language {
-            crate::hooks::Language::Node => "npm",
-            crate::hooks::Language::Rust => "cargo",
-            crate::hooks::Language::Java => "mvn",
-            crate::hooks::Language::Python => "python",
-            crate::hooks::Language::Go => "go",
-            crate::hooks::Language::Php => "php",
-            crate::hooks::Language::Ruby => "ruby",
-            crate::hooks::Language::CMake => "cmake",
-            crate::hooks::Language::CSharp => "dotnet",
-            crate::hooks::Language::Kotlin => "gradlew",
-            crate::hooks::Language::Swift => "swift",
-            crate::hooks::Language::Dart => "dart",
-            crate::hooks::Language::Elixir => "elixir",
+            Node => "npm",
+            Rust => "cargo",
+            Java => "mvn",
+            Python => "python",
+            Go => "go",
+            Php => "composer",
+            Ruby => "ruby",
+            CMake => "cmake",
+            CSharp => "dotnet",
+            Kotlin => "gradlew",
+            Swift => "swift",
+            Dart => "dart",
+            Elixir => "elixir",
         };
 
         if ok(
@@ -235,17 +237,14 @@ pub fn verify(hooks: &[Hook]) -> bool {
                 ),
             hook.success,
             hook.failure,
-            hook.file,
         )
             .is_err()
         {
-            let one = read_to_string(format!(".breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stdout{MAIN_SEPARATOR_STR}{}", hook.language, hook.file));
-            let two = read_to_string(format!(".breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stderr{MAIN_SEPARATOR_STR}{}", hook.language, hook.file));
-            eprintln!("\n{}\n{}\n\n", one.expect("Fail to read file"), two.expect("Fail to read file"));
-            return false;
+            status.push(false);
         }
+        else { status.push(true); }
     }
-    true
+    status.contains(&false).eq(&false)
 }
 
 /// Runs a set of predefined checks or hooks depending on the existence of certain project configuration files.
@@ -316,56 +315,44 @@ pub fn verify(hooks: &[Hook]) -> bool {
 /// - The function performs validation by matching file paths at the root of the project. Ensure
 ///   the function is executed in the appropriate working directory.
 ///
-pub fn run_hooks() -> Result<(), std::io::Error> {
-    if Path::new("Cargo.toml").exists() && verify(&RUST_HOOKS).eq(&false) {
-        return Err(std::io::Error::other("Some checks failed"));
+pub fn run_hooks() -> Result<(), Error> {
+    let mut all: HashMap<Language, bool> = HashMap::new();
+    if Path::new("Cargo.toml").is_file() {
+        all.insert(Rust, verify(&RUST_HOOKS));
     }
-    if Path::new("package.json").exists() && verify(&NODE_HOOKS).eq(&false) {
-        return Err(std::io::Error::other("Some checks failed"));
+    if Path::new("package.json").is_file() {
+        all.insert(Node, verify(&NODE_HOOKS));
     }
-    if Path::new("composer.json").exists() && verify(&PHP_HOOKS).eq(&false) {
-        return Err(std::io::Error::other("Some checks failed"));
+    if Path::new("composer.json").is_file() {
+        all.insert(Php, verify(&PHP_HOOKS));
     }
-    if Path::new("go.mod").exists() && verify(&GO_HOOKS).eq(&false) {
-        return Err(std::io::Error::other("Some checks failed"));
+    if Path::new("go.mod").is_file() {
+        all.insert(Go, verify(&GO_HOOKS));
     }
-    if Path::new(".csproj").exists() && verify(&CSHARP_HOOKS).eq(&false) {
-        return Err(std::io::Error::other("Some checks failed"));
+    if Path::new(".csproj").exists() {
+        all.insert(CSharp, verify(&CSHARP_HOOKS));
     }
-    if Path::new("build.gradle").exists() && verify(&JAVA_HOOKS).eq(&false) {
-        return Err(std::io::Error::other("Some checks failed"));
+    if Path::new("build.gradle").is_file() {
+        all.insert(Java, verify(&JAVA_HOOKS));
     }
-    if Path::new("CMakeLists.txt").exists()
-        && Command::new("cmake")
-            .arg(".")
-            .current_dir(".")
-            .spawn()
-            .expect("failed")
-            .wait()
-            .expect("failed")
-            .success()
-            .eq(&false)
-        && Command::new("make")
-            .current_dir(".")
-            .spawn()
-            .expect("failed")
-            .wait()
-            .expect("failed")
-            .success()
-            .eq(&false)
-        && Command::new("make")
-            .arg("test")
-            .current_dir(".")
-            .spawn()
-            .expect("failed")
-            .wait()
-            .expect("failed")
-            .success()
-            .eq(&false)
-    {
-        return Err(std::io::Error::other(
-            "Cmake configuration validation failed",
-        ));
+    let mut table = tabled::builder::Builder::default();
+    table.push_record(["Language", "Status"]);
+
+    let mut response: Vec<bool> = Vec::new();
+
+    for (language, &status) in &all {
+        response.push(status);
+        if status {
+            table.push_record([language.to_string(), "Success".to_string()]);
+        } else {
+            table.push_record([language.to_string(), "Failure".to_string()]);
+        }
+    }
+    let mut report = table.build();
+
+    println!("{}", report.with(Style::modern_rounded()));
+    if response.contains(&false) {
+        return Err(Error::other("some check is not valid"));
     }
     Ok(())
 }

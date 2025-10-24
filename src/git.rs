@@ -48,7 +48,6 @@ fn diff() {
         Command::new("sleep").arg("7"),
         "waiting",
         "waiting",
-        "waiting.log",
     )
     .expect("Fail to execute command");
     Command::new("git")
