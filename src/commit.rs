@@ -304,6 +304,39 @@ fn vcs() -> String {
     };
     String::from(vcs)
 }
+
+fn add() {
+    assert!(
+        Command::new(vcs())
+            .arg("add")
+            .arg(".")
+            .current_dir(".")
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap()
+            .success()
+    );
+}
+fn diff() {
+    if Confirm::new("show diff")
+        .with_default(true)
+        .prompt()
+        .expect("failed to get prompt")
+    {
+        assert!(
+            Command::new(vcs())
+                .arg("diff")
+                .arg("-p")
+                .current_dir(".")
+                .spawn()
+                .expect("vcs")
+                .wait()
+                .expect("failed")
+                .success()
+        );
+    }
+}
 pub struct Zen;
 impl Zen {
     ///
@@ -314,39 +347,9 @@ impl Zen {
         if run_hooks().is_err() {
             return ExitCode::FAILURE;
         }
-
-        if Confirm::new("show diff")
-            .with_default(true)
-            .prompt()
-            .expect("failed to get prompt")
-        {
-            assert!(
-                Command::new(vcs())
-                    .arg("diff")
-                    .arg("-p")
-                    .current_dir(".")
-                    .spawn()
-                    .expect("vcs")
-                    .wait()
-                    .expect("failed")
-                    .success()
-            );
-        }
         loop {
-            if Command::new(vcs())
-                .arg("add")
-                .arg(".")
-                .current_dir(".")
-                .spawn()
-                .unwrap()
-                .wait()
-                .unwrap()
-                .success()
-                .eq(&false)
-            {
-                eprintln!("failed to add source code");
-                return ExitCode::FAILURE;
-            }
+            diff();
+            add();
             let t = Select::new(
                 "Select a type:".green().bold().to_string().as_str(),
                 types(),
@@ -354,7 +357,6 @@ impl Zen {
             .with_vim_mode(true)
             .prompt()
             .expect("failed to get type");
-
             let summary = Text::new("Commit summary".green().bold().to_string().as_str())
                 .prompt()
                 .expect("failed to get summary");
@@ -371,15 +373,14 @@ impl Zen {
                     cmt,
                     "{}",
                     format!(
-                        "{}: {summary}",
+                        "{}: {summary}\n",
                         y.first().expect("failed to get type").trim_end()
                     )
                     .as_str()
                 )
                 .is_ok()
             );
-
-            assert!(writeln!(cmt, "{}", format!("\n\n{body}\n\n",).as_str()).is_ok());
+            assert!(writeln!(cmt, "\n{body}\n").is_ok());
             if Confirm::new(
                 read_to_string("commit")
                     .expect("failed to parse file")
