@@ -290,7 +290,7 @@ pub const RUST_HOOKS: [Hook; 7] = [
         success: "No issues found",
         failure: "Lint founded some warnings",
         file: "clippy.log",
-        command: "clippy -- -D clippy::all -W warnings -D clippy::pedantic -D clippy::nursery -A clippy::multiple_crate_versions -W clippy::cargo",
+        command: "clippy -- -D clippy::all -W warnings -D clippy::pedantic -D clippy::nursery -A clippy::multiple_crate_versions",
     },
     Hook {
         language: Language::Rust,

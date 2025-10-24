@@ -1,11 +1,8 @@
-pub mod git;
-
-pub mod hg;
-
-mod commit;
+pub mod commit;
 pub mod hooks;
 pub mod utils;
 
+use crate::commit::Zen;
 use crate::utils::{configure_git, configure_hg, run_hooks};
 use clap::Arg;
 use std::path::Path;
@@ -68,8 +65,7 @@ fn main() -> ExitCode {
             Err(_) => ExitCode::FAILURE,
         },
         Some(("commit", _)) => match (mercurial, git) {
-            (true, _) => hg::run(),
-            (_, true) => git::run(),
+            (true, _) | (_, true) => Zen::commit(),
             _ => ExitCode::FAILURE,
         },
         Some((cmd @ ("push" | "pull" | "status" | "log" | "diff"), _)) => match (mercurial, git) {

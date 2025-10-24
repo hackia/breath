@@ -1,3 +1,9 @@
+use crate::utils::{COMMIT_MESSAGE, run_hooks, types};
+use crossterm::style::Stylize;
+use inquire::{Confirm, Editor, Select, Text};
+use std::path::Path;
+use std::process::{Command, ExitCode};
+
 #[derive(Debug)]
 pub struct CommitType {
     pub category: &'static str,
@@ -284,3 +290,114 @@ pub const COMMIT_TYPES: [CommitType; 46] = [
         description: "Making code base more accessible",
     },
 ];
+
+pub struct Zen;
+impl Zen {
+    ///
+    /// # Panics
+    ///
+    #[must_use]
+    pub fn commit() -> ExitCode {
+        let mercurial = Path::new(".hg").is_dir();
+        let git = Path::new(".git").is_dir();
+        let vcs = if git {
+            "git"
+        } else if mercurial {
+            "hg"
+        } else {
+            "git"
+        };
+        if run_hooks().is_err() {
+            return ExitCode::FAILURE;
+        }
+
+        if Confirm::new("show diff")
+            .with_default(true)
+            .prompt()
+            .expect("failed to get prompt")
+        {
+            assert!(
+                Command::new(vcs)
+                    .arg("diff")
+                    .arg("-p")
+                    .current_dir(".")
+                    .spawn()
+                    .expect(vcs)
+                    .wait()
+                    .expect("failed")
+                    .success()
+            );
+        }
+        let mut x = String::new();
+        loop {
+            if Command::new(vcs)
+                .arg("add")
+                .arg(".")
+                .current_dir(".")
+                .spawn()
+                .unwrap()
+                .wait()
+                .unwrap()
+                .success()
+                .eq(&false)
+            {
+                eprintln!("failed to add source code");
+                return ExitCode::FAILURE;
+            }
+            x.clear();
+            let t = Select::new(
+                "Select a type:".green().bold().to_string().as_str(),
+                types(),
+            )
+            .with_vim_mode(true)
+            .prompt()
+            .expect("failed to get type");
+
+            let summary = Text::new("Commit summary".green().bold().to_string().as_str())
+                .prompt()
+                .expect("failed to get summary");
+            let body = Editor::new("Explain changes:")
+                .prompt()
+                .expect("failed to get body");
+            let y = t.split('~').collect::<Vec<&str>>();
+            x.push_str(
+                COMMIT_MESSAGE
+                    .replace("%type%", y.first().expect("").trim_end())
+                    .replace("%summary%", summary.trim_end())
+                    .replace("%body%", body.as_str())
+                    .as_str(),
+            );
+
+            if Confirm::new(x.as_str())
+                .with_default(false)
+                .prompt()
+                .expect("failed to get if ")
+                .eq(&false)
+            {
+                println!("aborted commit");
+                return ExitCode::SUCCESS;
+            }
+            if t.is_empty() || summary.is_empty() || body.is_empty() {
+                continue;
+            }
+            break;
+        }
+
+        if Command::new(vcs)
+            .arg("commit")
+            .arg("-m")
+            .arg(x.as_str())
+            .current_dir(".")
+            .spawn()
+            .unwrap()
+            .wait()
+            .unwrap()
+            .success()
+        {
+            ExitCode::SUCCESS
+        } else {
+            eprintln!("failed to run commit");
+            ExitCode::FAILURE
+        }
+    }
+}

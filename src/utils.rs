@@ -434,7 +434,8 @@ pub fn configure_git() -> bool {
             .expect("failed")
             .success()
 }
-pub const COMMIT_MESSAGE: &str = "%type%(%s%): %summary%\n%body%\n";
+
+pub const COMMIT_MESSAGE: &str = "%type%: %summary%\n\n%body%\n";
 
 #[must_use]
 pub fn configure_hg() -> bool {
