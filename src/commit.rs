@@ -1,9 +1,10 @@
 use crate::utils::{run_hooks, types};
 use crossterm::style::Stylize;
 use inquire::{Confirm, Editor, Select, Text};
+use std::fs::{File, read_to_string, remove_file};
+use std::io::Write;
 use std::path::Path;
 use std::process::{Command, ExitCode};
-
 #[derive(Debug)]
 pub struct CommitType {
     pub category: &'static str,
@@ -291,6 +292,18 @@ pub const COMMIT_TYPES: [CommitType; 46] = [
     },
 ];
 
+fn vcs() -> String {
+    let mercurial = Path::new(".hg").is_dir();
+    let git = Path::new(".git").is_dir();
+    let vcs = if git {
+        "git"
+    } else if mercurial {
+        "hg"
+    } else {
+        "git"
+    };
+    String::from(vcs)
+}
 pub struct Zen;
 impl Zen {
     ///
@@ -298,15 +311,6 @@ impl Zen {
     ///
     #[must_use]
     pub fn commit() -> ExitCode {
-        let mercurial = Path::new(".hg").is_dir();
-        let git = Path::new(".git").is_dir();
-        let vcs = if git {
-            "git"
-        } else if mercurial {
-            "hg"
-        } else {
-            "git"
-        };
         if run_hooks().is_err() {
             return ExitCode::FAILURE;
         }
@@ -317,20 +321,19 @@ impl Zen {
             .expect("failed to get prompt")
         {
             assert!(
-                Command::new(vcs)
+                Command::new(vcs())
                     .arg("diff")
                     .arg("-p")
                     .current_dir(".")
                     .spawn()
-                    .expect(vcs)
+                    .expect("vcs")
                     .wait()
                     .expect("failed")
                     .success()
             );
         }
-        let mut x = String::new();
         loop {
-            if Command::new(vcs)
+            if Command::new(vcs())
                 .arg("add")
                 .arg(".")
                 .current_dir(".")
@@ -344,7 +347,6 @@ impl Zen {
                 eprintln!("failed to add source code");
                 return ExitCode::FAILURE;
             }
-            x.clear();
             let t = Select::new(
                 "Select a type:".green().bold().to_string().as_str(),
                 types(),
@@ -359,24 +361,36 @@ impl Zen {
             let body = Editor::new("Explain changes:")
                 .prompt()
                 .expect("failed to get body");
+
             let y = t.split('~').collect::<Vec<&str>>();
-            x.push_str(y.first().expect("failed to get type").trim_end());
-            x.push(' ');
-            x.push_str(summary.trim_end());
 
-            let lines = body.split('\n').collect::<Vec<&str>>();
+            let mut cmt = File::create("commit").expect("failed to create file");
 
-            for line in lines {
-                x.push('\n');
-                x.push_str(line);
-            }
-            x.push('\n');
-            if Confirm::new(x.as_str())
-                .with_default(false)
-                .prompt()
-                .expect("failed to get if ")
-                .eq(&false)
+            assert!(
+                writeln!(
+                    cmt,
+                    "{}",
+                    format!(
+                        "{}: {summary}",
+                        y.first().expect("failed to get type").trim_end()
+                    )
+                    .as_str()
+                )
+                .is_ok()
+            );
+
+            assert!(writeln!(cmt, "{}", format!("\n\n{body}\n\n",).as_str()).is_ok());
+            if Confirm::new(
+                read_to_string("commit")
+                    .expect("failed to parse file")
+                    .as_str(),
+            )
+            .with_default(false)
+            .prompt()
+            .expect("failed to get if ")
+            .eq(&false)
             {
+                remove_file("commit").expect("failed to remove tmp file");
                 println!("aborted commit");
                 return ExitCode::SUCCESS;
             }
@@ -385,11 +399,10 @@ impl Zen {
             }
             break;
         }
-
-        if Command::new(vcs)
+        if Command::new(vcs())
             .arg("commit")
             .arg("-m")
-            .arg(x.as_str())
+            .arg(read_to_string("commit").expect("failed to get commit content"))
             .current_dir(".")
             .spawn()
             .unwrap()
@@ -397,6 +410,7 @@ impl Zen {
             .unwrap()
             .success()
         {
+            remove_file("commit").expect("failed to remove file");
             ExitCode::SUCCESS
         } else {
             eprintln!("failed to run commit");
