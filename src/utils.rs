@@ -408,12 +408,16 @@ pub fn zen() -> i32 {
                 "push",
                 "pull",
                 "edit",
+                "quit",
             ],
         )
         .prompt()
         .expect("");
         if option.eq("add") {
             call(vcs().as_str(), "add .");
+        }
+        if option.eq("quit") {
+            return 0;
         }
         if option.eq("edit") {
             call("broot", ".");
