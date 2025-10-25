@@ -3,12 +3,72 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Crates.io](https://img.shields.io/crates/v/breath.svg)](https://crates.io/crates/breath)
 
-A fast, interactive CLI that streamlines committing code to Git or Mercurial repositories.
-It can also run language-aware checks before you commit (format, lint, tests, security, deps) and stores
-logs per language under a .breathes directory.
+## Core Features
 
-VCS detection: Breath auto-detects the repository type at runtime by checking for .git or .hg.
-No Cargo features are required to switch between Git and Mercurial.
+Breath is more than just a commit helper; it's an integrated development companion.
+
+### 1. VCS Agnostic
+Breath works seamlessly whether your project uses Git or Mercurial. It auto-detects the correct version control system by checking for `.git` or `.hg` directories at runtime. All convenience commands, like `breath status`, `log`, `diff`, `push`, and `pull`, are automatically proxied to the correct underlying tool.
+
+### 2. Guided Interactive Commits
+Instead of a simple `commit -m`, `breath commit` launches an interactive wizard:
+* **Structured Input:** Prompts you for a "type", "summary", and "body" using `inquire`.
+* **Expressive Typology:** Uses a unique, space-themed commit typology (e.g., `Star` for features, `Comet` for fixes, `Nebula` for refactoring) to create more descriptive and organized commit histories.
+
+### 3. Automatic Pre-Commit Health Checks
+The `breath health` command acts as a quality gate for your code. This feature is also integrated directly into the `commit` flow.
+* **Language-Aware:** Automatically detects your project's technology stack by looking for marker files like `Cargo.toml`, `package.json`, `go.mod`, `composer.json`, etc..
+* **Runs Hooks:** Executes a predefined set of hooks for each detected language, including formatting, linting, testing, and security audits (e.g., `cargo audit`, `npm test`, `go vet`, `dotnet test`).
+* **Logs Outputs:** All hook outputs (both stdout and stderr) are captured and stored in the `.breathes/` directory for easy debugging.
+
+### 4. Interactive "Zen" Mode
+For users who prefer a persistent TUI, `breath zen` provides a "loop menu" that acts as a central hub for all operations. From this menu, you can select tasks like `add`, `commit`, `hooks`, `push`, `pull`, and even manage patch-based email workflows.
+
+### 5. Email & Patch Workflow Integration
+Breath embraces the email-based patch workflow used by many open-source projects.
+* **Configuration:** The `breath config git` command interactively prompts for `user.name`, `user.email`, and `core.editor`, and includes a built-in email format validator.
+* **Send Patches:** The "Zen" mode includes a `patch_send` shortcut, which validates a recipient's email and uses `git send-email` to send patches.
+* **View Email:** It also includes a shortcut to launch the `aerc` email client to apply incoming patches.
+
+### 6. Shell Completions
+To improve usability, `breath` provides pre-built shell completion scripts for **Bash**, **Fish**, and **Zsh**.
+
+---
+
+Let me know if you want to move on to the "Installation" or "Usage" sections next.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 | Category                      | Commit Type                | Mnemonic                                                                                           | Description                                              | Example                                                                               |
 |-------------------------------|----------------------------|----------------------------------------------------------------------------------------------------|----------------------------------------------------------|---------------------------------------------------------------------------------------|
