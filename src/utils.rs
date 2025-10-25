@@ -421,6 +421,7 @@ pub fn zen() -> i32 {
         "log",
         "clone",
         "diff",
+        "email",
         "commit",
         "list_tags",
         "add_tag",
@@ -456,6 +457,9 @@ pub fn zen() -> i32 {
                 vcs().as_str(),
                 format!("send-email --to {to} ./patches").as_str(),
             );
+        }
+        if option.eq("email") {
+            call("aerc", "");
         }
         if option.eq("log") {
             call(vcs().as_str(), "log");
