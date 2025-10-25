@@ -2,7 +2,7 @@ use crate::utils::{run_hooks, types};
 use crossterm::style::Stylize;
 use inquire::{Confirm, Editor, Select, Text};
 use std::path::Path;
-use std::process::{Command, ExitCode};
+use std::process::Command;
 #[derive(Debug)]
 pub struct CommitType {
     pub category: &'static str,
@@ -290,7 +290,7 @@ pub const COMMIT_TYPES: [CommitType; 46] = [
     },
 ];
 
-fn vcs() -> String {
+pub fn vcs() -> String {
     let mercurial = Path::new(".hg").is_dir();
     let git = Path::new(".git").is_dir();
     let vcs = if git {
@@ -303,7 +303,7 @@ fn vcs() -> String {
     String::from(vcs)
 }
 
-fn add() {
+pub fn add() {
     assert!(
         Command::new(vcs())
             .arg("add")
@@ -316,7 +316,7 @@ fn add() {
             .success()
     );
 }
-fn diff() {
+pub fn diff() {
     if Confirm::new("show diff")
         .with_default(true)
         .prompt()
@@ -336,7 +336,7 @@ fn diff() {
     }
 }
 
-fn commit(msg: &str) -> ExitCode {
+pub fn commit(msg: &str) -> i32 {
     if Command::new(vcs())
         .arg("commit")
         .arg("-m")
@@ -348,10 +348,10 @@ fn commit(msg: &str) -> ExitCode {
         .unwrap()
         .success()
     {
-        ExitCode::SUCCESS
+        0
     } else {
         eprintln!("failed to run commit");
-        ExitCode::FAILURE
+        1
     }
 }
 pub const COMMIT_MESSAGE: &str = "%type%: %summary%\n\n%body%\n";
@@ -362,9 +362,9 @@ impl Zen {
     /// # Panics
     ///
     #[must_use]
-    pub fn commit() -> ExitCode {
+    pub fn commit() -> i32 {
         if run_hooks().is_err() {
-            return ExitCode::FAILURE;
+            return 1;
         }
         loop {
             diff();
@@ -395,7 +395,7 @@ impl Zen {
                 .eq(&false)
             {
                 println!("aborted commit");
-                return ExitCode::SUCCESS;
+                return 0;
             }
             if t.is_empty() || summary.is_empty() || body.is_empty() {
                 continue;

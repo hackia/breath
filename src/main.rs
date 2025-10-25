@@ -3,21 +3,12 @@ pub mod hooks;
 pub mod utils;
 
 use crate::commit::Zen;
-use crate::utils::{configure_git, configure_hg, run_hooks};
+use crate::utils::{call, configure_git, configure_hg, run_hooks, zen};
 use clap::Arg;
 use std::path::Path;
-use std::process::{Command, ExitCode};
+use std::process::{exit, ExitCode};
 
-fn call(program: &str, arg: &str) -> bool {
-    Command::new(program)
-        .arg(arg)
-        .current_dir(".")
-        .spawn()
-        .expect("Fail to execute command")
-        .wait()
-        .expect("Fail to execute command")
-        .success()
-}
+
 fn breathes() -> clap::ArgMatches {
     clap::Command::new("breath")
         .version(env!("CARGO_PKG_VERSION"))
@@ -39,6 +30,7 @@ fn breathes() -> clap::ArgMatches {
         .subcommand(clap::Command::new("push").about("Push changes to remote repositories"))
         .subcommand(clap::Command::new("pull").about("Pull changes from remote repositories"))
         .subcommand(clap::Command::new("status").about("Show the status of the repository"))
+        .subcommand(clap::Command::new("zen").about("display a loop menu to interact with breath"))
         .subcommand(clap::Command::new("log").about("Show the commit log"))
         .subcommand(
             clap::Command::new("diff")
@@ -60,12 +52,13 @@ fn main() -> ExitCode {
                 _ => ExitCode::FAILURE,
             }
         }
+        Some(("zen",_)) => exit(zen()),
         Some(("health", _)) => match run_hooks() {
             Ok(()) => ExitCode::SUCCESS,
             Err(_) => ExitCode::FAILURE,
         },
         Some(("commit", _)) => match (mercurial, git) {
-            (true, _) | (_, true) => Zen::commit(),
+            (true, _) | (_, true) => exit(Zen::commit()),
             _ => ExitCode::FAILURE,
         },
         Some((cmd @ ("push" | "pull" | "status" | "log" | "diff"), _)) => match (mercurial, git) {

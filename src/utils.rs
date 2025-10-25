@@ -1,18 +1,17 @@
-use crate::commit::COMMIT_TYPES;
-use crate::hooks::Language::{
-    CMake, CSharp, Dart, Elixir, Go, Java, Kotlin, Node, Php, Python, Ruby, Rust, Swift,
-};
+use crate::commit::{COMMIT_TYPES, Zen, diff, vcs};
 use crate::hooks::{
-    CSHARP_HOOKS, GO_HOOKS, Hook, JAVA_HOOKS, Language, NODE_HOOKS, PHP_HOOKS, RUST_HOOKS,
+    CMAKE_HOOKS, CSHARP_HOOKS, GO_HOOKS, Hook, JAVA_HOOKS, LANGUAGES, Language, NODE_HOOKS,
+    PHP_HOOKS, RUST_HOOKS,
 };
 use crossterm::style::Stylize;
-use inquire::Text;
+use inquire::{Confirm, MultiSelect, Select, Text};
 use spinners::{Spinner, Spinners};
 use std::collections::HashMap;
 use std::fs::{File, create_dir_all};
 use std::io::Error;
 use std::path::{MAIN_SEPARATOR_STR, Path};
 use std::process::Command;
+use std::time::Instant;
 use tabled::settings::Style;
 
 /// Executes a command and provides real-time visual feedback while processing.
@@ -65,7 +64,7 @@ use tabled::settings::Style;
 /// }
 /// ```
 pub fn ok(message: &str, cmd: &mut Command, success: &str, failure: &str) -> std::io::Result<()> {
-    let mut output = Spinner::new(Spinners::Line, message.to_string());
+    let mut output = Spinner::new(Spinners::Line, message.white().to_string());
     let status = cmd
         .current_dir(".")
         .spawn()
@@ -75,12 +74,26 @@ pub fn ok(message: &str, cmd: &mut Command, success: &str, failure: &str) -> std
         .code()
         .expect("fail to get exit code");
     if status.eq(&0) {
-        output.stop_and_persist("✓".green().to_string().as_str(), success.blue().to_string());
+        output.stop_and_persist(
+            "✓".green().to_string().as_str(),
+            success.dark_cyan().to_string(),
+        );
         Ok(())
     } else {
-        output.stop_and_persist("!".red().to_string().as_str(), message.yellow().to_string());
+        output.stop_and_persist("!".red().to_string().as_str(), failure.yellow().to_string());
         Err(Error::other(failure))
     }
+}
+
+pub fn call(program: &str, arg: &str) -> bool {
+    Command::new(program)
+        .args(arg.split_whitespace())
+        .current_dir(".")
+        .spawn()
+        .expect("Fail to execute command")
+        .wait()
+        .expect("Fail to execute command")
+        .success()
 }
 
 /// Returns a sorted list of formatted commit type strings.
@@ -189,7 +202,8 @@ pub fn types() -> Vec<String> {
 /// - `cargo` commands for project verification.
 /// - Logs are written to the `.breathes ` directory for each respective check.
 #[must_use]
-pub fn verify(hooks: &[Hook]) -> bool {
+pub fn verify(hooks: &[Hook]) -> (bool, u128) {
+    let start = Instant::now();
     create_dir_all(".breathes").expect("Fail to create .breathes directory");
     let mut status: Vec<bool> = Vec::new();
     for hook in hooks {
@@ -206,25 +220,9 @@ pub fn verify(hooks: &[Hook]) -> bool {
         ))
         .expect("Fail to create .breathes/out_dir directory");
 
-        let program = match hook.language {
-            Node => "npm",
-            Rust => "cargo",
-            Java => "mvn",
-            Python => "python",
-            Go => "go",
-            Php => "composer",
-            Ruby => "ruby",
-            CMake => "cmake",
-            CSharp => "dotnet",
-            Kotlin => "gradlew",
-            Swift => "swift",
-            Dart => "dart",
-            Elixir => "elixir",
-        };
-
         if ok(
             hook.description,
-            Command::new(program)
+            Command::new("sh").arg("-c")
                 .args(hook.command.split_whitespace())
                 .current_dir(".")
                 .stderr(
@@ -242,9 +240,13 @@ pub fn verify(hooks: &[Hook]) -> bool {
         {
             status.push(false);
         }
-        else { status.push(true); }
+        else {
+            status.push(true); }
     }
-    status.contains(&false).eq(&false)
+    (
+        status.contains(&false).eq(&false),
+        start.elapsed().as_millis(),
+    )
 }
 
 /// Runs a set of predefined checks or hooks depending on the existence of certain project configuration files.
@@ -316,37 +318,72 @@ pub fn verify(hooks: &[Hook]) -> bool {
 ///   the function is executed in the appropriate working directory.
 ///
 pub fn run_hooks() -> Result<(), Error> {
-    let mut all: HashMap<Language, bool> = HashMap::new();
-    if Path::new("Cargo.toml").is_file() {
-        all.insert(Rust, verify(&RUST_HOOKS));
+    let start = Instant::now();
+    let mut response: Vec<bool> = Vec::new();
+    let l = detect();
+    if l.is_empty() {
+        return Err(Error::other("No language detected or supported"));
     }
-    if Path::new("package.json").is_file() {
-        all.insert(Node, verify(&NODE_HOOKS));
+    let mut all: HashMap<String, (bool, u128)> = HashMap::new();
+    let mut table = tabled::builder::Builder::default();
+    table.push_record(["Detected"]);
+    for language in &l {
+        table.push_record([language.to_string()]);
     }
-    if Path::new("composer.json").is_file() {
-        all.insert(Php, verify(&PHP_HOOKS));
-    }
-    if Path::new("go.mod").is_file() {
-        all.insert(Go, verify(&GO_HOOKS));
-    }
-    if Path::new(".csproj").exists() {
-        all.insert(CSharp, verify(&CSHARP_HOOKS));
-    }
-    if Path::new("build.gradle").is_file() {
-        all.insert(Java, verify(&JAVA_HOOKS));
+    let mut x = table.build();
+    println!("{}", x.with(Style::modern_rounded()));
+    if Confirm::new("Check all")
+        .with_default(true)
+        .prompt()
+        .expect("failed to get response")
+    {
+        for lang in &l {
+            run_hook(lang.as_str(), &mut all);
+        }
+    } else {
+        let mut languages: Vec<String>;
+        loop {
+            languages = MultiSelect::new("Select the languages to test", l.to_vec())
+                .prompt()
+                .expect("failed to get language");
+            if !languages.is_empty() {
+                break;
+            }
+        }
+        for lang in &languages {
+            run_hook(lang.as_str(), &mut all);
+        }
     }
     let mut table = tabled::builder::Builder::default();
-    table.push_record(["Language", "Status"]);
-
-    let mut response: Vec<bool> = Vec::new();
-
+    table.push_record(["Language", "Status", "Take"]);
     for (language, &status) in &all {
-        response.push(status);
-        if status {
-            table.push_record([language.to_string(), "Success".to_string()]);
+        response.push(status.0);
+        if status.0 {
+            table.push_record([
+                language.to_string(),
+                "Success".to_string(),
+                format!("{}ms", status.1),
+            ]);
         } else {
-            table.push_record([language.to_string(), "Failure".to_string()]);
+            table.push_record([
+                language.to_string(),
+                "Failure".to_string(),
+                format!("{}ms", status.1),
+            ]);
         }
+    }
+    if response.contains(&false) {
+        table.push_record([
+            "All".to_string(),
+            String::from("Failure"),
+            format!("{}ms", start.elapsed().as_millis()),
+        ]);
+    } else {
+        table.push_record([
+            "All".to_string(),
+            String::from("Success"),
+            format!("{}ms", start.elapsed().as_millis()),
+        ]);
     }
     let mut report = table.build();
 
@@ -357,6 +394,97 @@ pub fn run_hooks() -> Result<(), Error> {
     Ok(())
 }
 
+pub fn zen() -> i32 {
+    loop {
+        let option = Select::new(
+            "wishes",
+            vec![
+                "add",
+                "diff",
+                "commit",
+                "list_tags",
+                "hooks",
+                "status",
+                "push",
+                "pull",
+                "edit",
+            ],
+        )
+        .prompt()
+        .expect("");
+        if option.eq("add") {
+            call(vcs().as_str(), "add .");
+        }
+        if option.eq("edit") {
+            call("broot", ".");
+        }
+        if option.eq("list_tags") {
+            call(vcs().as_str(), "tag");
+        }
+        if option.eq("status") {
+            call(vcs().as_str(), "status");
+        }
+        if option.eq("diff") {
+            diff();
+        }
+        if option.eq("commit") {
+            let _ = Zen::commit();
+        }
+        if option.eq("hooks") {
+            let _ = run_hooks();
+        }
+        if option.eq("push") {
+            call(vcs().as_str(), "push");
+        }
+        if option.eq("pull") {
+            call(vcs().as_str(), "pull");
+        }
+        if Confirm::new("Quit")
+            .with_default(false)
+            .prompt()
+            .expect("fail to get")
+            .eq(&true)
+        {
+            return 0;
+        }
+    }
+}
+fn run_hook(lang: &str, all: &mut HashMap<String, (bool, u128)>) {
+    if lang == "Java" {
+        all.insert(lang.to_string(), verify(&JAVA_HOOKS));
+    }
+    if lang == "CSharp" {
+        all.insert(lang.to_string(), verify(&CSHARP_HOOKS));
+    }
+    if lang == "Php" {
+        all.insert(lang.to_string(), verify(&PHP_HOOKS));
+    }
+    if lang == "Node" {
+        all.insert(lang.to_string(), verify(&NODE_HOOKS));
+    }
+    if lang == "Go" {
+        all.insert(lang.to_string(), verify(&GO_HOOKS));
+    }
+    if lang == "Rust" {
+        all.insert(lang.to_string(), verify(&RUST_HOOKS));
+    }
+    if lang == "CMake" {
+        all.insert(lang.to_string(), verify(&CMAKE_HOOKS));
+    }
+}
+
+fn add_if_exists(file: &str, language: Language, vec: &mut Vec<String>) {
+    if Path::new(file).exists() {
+        vec.push(language.to_string());
+    }
+}
+pub fn detect() -> Vec<String> {
+    let mut all: Vec<String> = Vec::new();
+    for (l, file) in &LANGUAGES {
+        add_if_exists(file, l.clone(), &mut all);
+    }
+    all
+}
 /// Configures Git with global settings for username, email, and editor.
 ///
 /// This function uses the command-line `git config` utility to set the global

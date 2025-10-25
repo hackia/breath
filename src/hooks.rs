@@ -1,6 +1,7 @@
 use std::fmt::{Display, Formatter};
+use tabled::Tabled;
 
-#[derive(Clone, Hash, Eq, PartialEq)]
+#[derive(Clone, Hash, Eq, PartialEq, Tabled)]
 pub enum Language {
     Node,
     Rust,
@@ -15,8 +16,21 @@ pub enum Language {
     Swift,
     Dart,
     Elixir,
+    All,
 }
 
+pub const RUST_FILE: &str = "Cargo.toml";
+pub const GO_FILE: &str = "go.mod";
+pub const PHP_FILE: &str = "composer.json";
+pub const NODE_FILE: &str = "package.json";
+pub const CMAKE_FILE: &str = "CMakeLists.txt";
+pub const LANGUAGES: [(Language, &str); 5] = [
+    (Language::Rust, RUST_FILE),
+    (Language::Go, GO_FILE),
+    (Language::Php, PHP_FILE),
+    (Language::Node, NODE_FILE),
+    (Language::CMake, CMAKE_FILE),
+];
 impl Display for Language {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -33,6 +47,7 @@ impl Display for Language {
             Self::Swift => write!(f, "Swift"),
             Self::Dart => write!(f, "Dart"),
             Self::Elixir => write!(f, "Elixir"),
+            Self::All => write!(f, "All"),
         }
     }
 }
@@ -49,65 +64,57 @@ pub struct Hook {
 pub const CSHARP_HOOKS: [Hook; 5] = [
     Hook {
         language: Language::CSharp,
-        description: "Checks for code formatting in your C# project.",
+        description: "Checking for code formatting",
         success: "Code formatting is correct",
         failure: "Code formatting issues found",
         file: "format.log",
-        command: "format --verify-no-changes",
+        command: "dotnet format --verify-no-changes",
     },
     Hook {
         language: Language::CSharp,
-        description: "Builds the C# project.",
+        description: "Building your project.",
         success: "Build successful",
         failure: "Build failed",
         file: "build.log",
-        command: "build",
+        command: "dotnet build",
     },
     Hook {
         language: Language::CSharp,
-        description: "Runs unit tests for your C# project.",
+        description: "Running unit tests.",
         success: "Tests passed",
         failure: "Tests failed",
         file: "test.log",
-        command: "test",
+        command: "dotnet test",
     },
     Hook {
         language: Language::CSharp,
-        description: "Performs static code analysis.",
+        description: "Performing static code analysis.",
         success: "No issues found",
         failure: "Code analysis issues found",
         file: "analyze.log",
-        command: "analyze",
+        command: "dotnet analyze",
     },
     Hook {
         language: Language::CSharp,
-        description: "Checks NuGet package dependencies.",
+        description: "Checking nuget package dependencies.",
         success: "Dependencies are up to date",
         failure: "Dependency issues found",
         file: "deps.log",
-        command: "restore",
+        command: "dotnet restore",
     },
 ];
-pub const JAVA_HOOKS: [Hook; 5] = [
+pub const JAVA_HOOKS: [Hook; 3] = [
     Hook {
         language: Language::Java,
-        description: "Checks code formatting with Google Java Format.",
-        success: "Code formatting is correct",
-        failure: "Code formatting issues found",
-        file: "format.log",
-        command: "google-java-format --dry-run",
-    },
-    Hook {
-        language: Language::Java,
-        description: "Builds the Java project with Maven.",
+        description: "Building your Java project.",
         success: "Build successful",
         failure: "Build failed",
         file: "build.log",
-        command: "clean compile",
+        command: "java clean compile",
     },
     Hook {
         language: Language::Java,
-        description: "Runs unit tests with JUnit.",
+        description: "Running unit tests.",
         success: "Tests passed",
         failure: "Tests failed",
         file: "test.log",
@@ -115,15 +122,7 @@ pub const JAVA_HOOKS: [Hook; 5] = [
     },
     Hook {
         language: Language::Java,
-        description: "Analyzes code with SpotBugs.",
-        success: "No issues found",
-        failure: "Code analysis issues found",
-        file: "analyze.log",
-        command: "spotbugs:check",
-    },
-    Hook {
-        language: Language::Java,
-        description: "Checks for dependency updates.",
+        description: "Checking for dependency updates.",
         success: "Dependencies are up to date",
         failure: "Dependency updates available",
         file: "deps.log",
@@ -133,19 +132,19 @@ pub const JAVA_HOOKS: [Hook; 5] = [
 pub const GO_HOOKS: [Hook; 5] = [
     Hook {
         language: Language::Go,
-        description: "Checks for code formatting in your Go project.",
+        description: "Checking code format.",
         success: "Code formatting is correct",
         failure: "Code formatting issues found",
         file: "gofmt.log",
-        command: "fmt",
+        command: "go fmt",
     },
     Hook {
         language: Language::Go,
-        description: "Runs unit tests for your Go project.",
+        description: "Running unit tests.",
         success: "Tests passed",
         failure: "Tests failed",
         file: "test.log",
-        command: "test -v",
+        command: "go test -v",
     },
     Hook {
         language: Language::Go,
@@ -153,15 +152,15 @@ pub const GO_HOOKS: [Hook; 5] = [
         success: "No issues found",
         failure: "Static analysis issues found",
         file: "lint.log",
-        command: "vet",
+        command: "go vet",
     },
     Hook {
         language: Language::Go,
-        description: "Checks dependency management.",
+        description: "Checking dependency management.",
         success: "Dependencies are properly managed",
         failure: "Dependency issues found",
         file: "deps.log",
-        command: "mod tidy",
+        command: "go mod tidy",
     },
     Hook {
         language: Language::Go,
@@ -169,57 +168,75 @@ pub const GO_HOOKS: [Hook; 5] = [
         success: "Build successful",
         failure: "Build failed",
         file: "build.log",
-        command: "build",
+        command: "go build",
     },
 ];
-pub const CMAKE_HOOKS: [Hook; 1] = [Hook {
-    language: Language::CMake,
-    description: "Validates CMake configuration files.",
-    success: "CMake configuration is valid",
-    failure: "CMake configuration validation failed",
-    file: "cmake-validate.log",
-    command: "cmake . && make && make test",
-}];
+pub const CMAKE_HOOKS: [Hook; 3] = [
+    Hook {
+        language: Language::CMake,
+        description: "Validates CMake configuration files.",
+        success: "CMake configuration is valid",
+        failure: "CMake configuration validation failed",
+        file: "cmake.log",
+        command: "cmake .",
+    },
+    Hook {
+        language: Language::CMake,
+        description: "Validates CMake configuration files.",
+        success: "Build success",
+        failure: "Build failed",
+        file: "make.log",
+        command: "make",
+    },
+    Hook {
+        language: Language::CMake,
+        description: "Validates CMake configuration files.",
+        success: "Test success",
+        failure: "test failures",
+        file: "test.log",
+        command: "make test",
+    },
+];
 
 pub const PHP_HOOKS: [Hook; 6] = [
     Hook {
         language: Language::Php,
-        description: "Checks that your PHP and extensions versions match the platform requirements of the installed packages.",
+        description: "Installing the project.",
         success: "Installed successfully on your system",
-        failure: "Failed to install requirements in your system",
+        failure: "Failed to install in your system",
         file: "install.log",
-        command: "install",
+        command: "composer install",
     },
     Hook {
         language: Language::Php,
-        description: "Checks that your PHP and extensions versions match the platform requirements of the installed packages.",
-        success: "No missing requirements on your system",
-        failure: "Mising requirements in your system",
+        description: "Checking our php extensions.",
+        success: "No missing extensions on your system",
+        failure: "Mising extension in your system",
         file: "check-platform-reqs.log",
-        command: "check-platform-reqs",
+        command: "composer check-platform-reqs",
     },
     Hook {
         language: Language::Php,
-        description: "Checks for outdated packages in your PHP project.",
+        description: "Checking the composer file.",
         success: "Composer file is valid",
         failure: "Composer file is not valid",
-        command: "validate",
+        command: "composer validate",
         file: "validate.log",
     },
     Hook {
         language: Language::Php,
-        description: "Checks for security vulnerabilities in your PHP dependencies.",
+        description: "Checking for security vulnerabilities.",
         success: "No vulnerabilities has been founded",
         failure: "Vulnerabilities has been founded",
-        command: "audit",
+        command: "composer audit",
         file: "audit.log",
     },
     Hook {
         language: Language::Php,
-        description: "Checks outdated packages.",
+        description: "Checking outdated packages.",
         success: "No outdated packages found",
         failure: "Outdated packages founded",
-        command: "outdated",
+        command: "composer outdated",
         file: "outdated.log",
     },
     Hook {
@@ -228,61 +245,61 @@ pub const PHP_HOOKS: [Hook; 6] = [
         success: "Tests passed",
         failure: "Tests failed",
         file: "test.log",
-        command: "run test",
+        command: "composer run test",
     },
 ];
 
 pub const NODE_HOOKS: [Hook; 3] = [
     Hook {
         language: Language::Node,
-        description: "Checks for outdated packages in your Node.js project.",
+        description: "Checks for outdated packages in your project.",
         success: "No outdated packages found",
         failure: "Outdated packages found",
-        command: "outdated",
+        command: "npm outdated",
         file: "outdated.log",
     },
     Hook {
         language: Language::Node,
-        description: "Runs tests for your Node.js project.",
+        description: "Testings your project.",
         success: "Tests passed",
         failure: "Tests failed",
         file: "test.log",
-        command: "run test",
+        command: "npm run test",
     },
     Hook {
         language: Language::Node,
-        description: "Auditing your NodeJs project.",
+        description: "Auditing your project.",
         success: "No vulnerabilities founded",
         failure: "Vulnerabilities founded",
         file: "audit.log",
-        command: "audit",
+        command: "npm audit",
     },
 ];
 
 pub const RUST_HOOKS: [Hook; 7] = [
     Hook {
         language: Language::Rust,
-        description: "Checks for security vulnerabilities in your Rust dependencies.",
+        description: "Checking the configuration",
         success: "Project is valid",
         failure: "Project not valid",
         file: "project.log",
-        command: "verify-project",
+        command: "cargo verify-project",
     },
     Hook {
         language: Language::Rust,
-        description: "Checks build capability for dependencies.",
+        description: "Checking build capability",
         success: "Can build the project",
         failure: "Cargo check detect failure",
         file: "check.log",
-        command: "check",
+        command: "cargo check",
     },
     Hook {
         language: Language::Rust,
-        description: "Checks for security vulnerabilities in your Rust dependencies.",
+        description: "Checking for security vulnerabilities",
         success: "No vulnerabilities found",
         failure: "Vulnerabilities found",
         file: "audit.log",
-        command: "audit",
+        command: "cargo audit",
     },
     Hook {
         language: Language::Rust,
@@ -290,7 +307,7 @@ pub const RUST_HOOKS: [Hook; 7] = [
         file: "fmt.log",
         success: "Respect the code format standard",
         failure: "Not respect code format standard",
-        command: "fmt --check",
+        command: "cargo fmt --check",
     },
     Hook {
         language: Language::Rust,
@@ -298,22 +315,22 @@ pub const RUST_HOOKS: [Hook; 7] = [
         success: "No issues found",
         failure: "Lint founded some warnings",
         file: "clippy.log",
-        command: "clippy -- -D clippy::all -W warnings -D clippy::pedantic -D clippy::nursery -A clippy::multiple_crate_versions",
+        command: "cargo clippy -- -D clippy::all -W warnings -D clippy::pedantic -D clippy::nursery -A clippy::multiple_crate_versions",
     },
     Hook {
         language: Language::Rust,
-        description: "Runs tests for your Rust project.",
+        description: "Testing your project.",
         success: "Tests passed",
         failure: "Tests failed",
         file: "test.log",
-        command: "test --no-fail-fast",
+        command: "cargo test --no-fail-fast",
     },
     Hook {
         language: Language::Rust,
         description: "Checks for outdated packages in your Rust project.",
         success: "No outdated packages found",
         failure: "Outdated packages found",
-        command: "outdated",
+        command: "cargo outdated",
         file: "outdated.log",
     },
 ];
