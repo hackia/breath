@@ -440,6 +440,20 @@ pub fn zen() -> i32 {
             );
         }
 
+        if option.eq("add_tag") && Path::new(".hg").is_dir() {
+            call(
+                vcs().as_str(),
+                format!(
+                    "tag {}",
+                    Text::new("specifies a tagging message")
+                        .prompt()
+                        .expect("specifies a tagging message")
+                        .as_str(),
+                )
+                .as_str(),
+            );
+        }
+
         if option.eq("clone") {
             call(
                 vcs().as_str(),
@@ -450,7 +464,7 @@ pub fn zen() -> i32 {
                         .expect("specifies a tagging message")
                         .as_str(),
                 )
-                    .as_str(),
+                .as_str(),
             );
         }
         if option.eq("quit") {
