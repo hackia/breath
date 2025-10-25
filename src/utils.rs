@@ -239,9 +239,9 @@ pub fn verify(hooks: &[Hook]) -> (bool, u128) {
             .is_err()
         {
             status.push(false);
+        } else {
+            status.push(true);
         }
-        else {
-            status.push(true); }
     }
     (
         status.contains(&false).eq(&false),
@@ -400,9 +400,12 @@ pub fn zen() -> i32 {
             "wishes",
             vec![
                 "add",
+                "log",
+                "clone",
                 "diff",
                 "commit",
                 "list_tags",
+                "add_tag",
                 "hooks",
                 "status",
                 "push",
@@ -415,6 +418,40 @@ pub fn zen() -> i32 {
         .expect("");
         if option.eq("add") {
             call(vcs().as_str(), "add .");
+        }
+        if option.eq("log") {
+            call(vcs().as_str(), "log");
+        }
+        if option.eq("add_tag") && Path::new(".git").is_dir() {
+            call(
+                vcs().as_str(),
+                format!(
+                    "tag -m {} -a {}",
+                    Text::new("specifies an annotated tagging message")
+                        .prompt()
+                        .expect("specifies a tagging message")
+                        .as_str(),
+                    Text::new("annotated tag version")
+                        .prompt()
+                        .expect("specifies a tagging message")
+                        .as_str(),
+                )
+                .as_str(),
+            );
+        }
+
+        if option.eq("clone") {
+            call(
+                vcs().as_str(),
+                format!(
+                    "clone {}",
+                    Text::new("specifies the repository clone url")
+                        .prompt()
+                        .expect("specifies a tagging message")
+                        .as_str(),
+                )
+                    .as_str(),
+            );
         }
         if option.eq("quit") {
             return 0;
