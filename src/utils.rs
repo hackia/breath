@@ -4,7 +4,10 @@ use crate::hooks::{
     PHP_HOOKS, RUST_HOOKS,
 };
 use crossterm::style::Stylize;
-use inquire::{Confirm, MultiSelect, Select, Text};
+use inquire::validator::{StringValidator, Validation};
+use inquire::{Confirm, CustomUserError, MultiSelect, Select, Text};
+use lazy_static::lazy_static;
+use regex::Regex;
 use spinners::{Spinner, Spinners};
 use std::collections::HashMap;
 use std::fs::{File, create_dir_all};
@@ -14,6 +17,23 @@ use std::process::Command;
 use std::time::Instant;
 use tabled::settings::Style;
 
+lazy_static! {
+    static ref EMAIL_REGEX: Regex =
+        Regex::new(r"^[a-zA-Z0-9._+-]+@([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$").unwrap();
+}
+
+#[derive(Clone)]
+pub struct EmailValidator;
+
+impl StringValidator for EmailValidator {
+    fn validate(&self, input: &str) -> Result<Validation, CustomUserError> {
+        if EMAIL_REGEX.is_match(input) {
+            Ok(Validation::Valid)
+        } else {
+            Ok(Validation::Invalid("No a valid email".into()))
+        }
+    }
+}
 /// Executes a command and provides real-time visual feedback while processing.
 ///
 /// This function displays a spinner animation while a command is executed. If the command
@@ -395,29 +415,47 @@ pub fn run_hooks() -> Result<(), Error> {
 }
 
 pub fn zen() -> i32 {
+    let mut options = vec![
+        "add",
+        "patch_send",
+        "log",
+        "clone",
+        "diff",
+        "commit",
+        "list_tags",
+        "add_tag",
+        "hooks",
+        "status",
+        "push",
+        "pull",
+        "edit",
+        "quit",
+    ];
+    options.sort();
     loop {
-        let option = Select::new(
-            "wishes",
-            vec![
-                "add",
-                "log",
-                "clone",
-                "diff",
-                "commit",
-                "list_tags",
-                "add_tag",
-                "hooks",
-                "status",
-                "push",
-                "pull",
-                "edit",
-                "quit",
-            ],
-        )
-        .prompt()
-        .expect("");
+        let option = Select::new("wishes", options.to_vec()).prompt().expect("");
         if option.eq("add") {
             call(vcs().as_str(), "add .");
+        }
+        if option.eq("patch_send") && Path::new(".git").is_dir() {
+            let mut to = String::new();
+            loop {
+                to.clear();
+                to.push_str(
+                    Text::new("to")
+                        .with_validator(EmailValidator)
+                        .prompt()
+                        .expect("to missing")
+                        .as_str(),
+                );
+                if !to.is_empty() {
+                    break;
+                }
+            }
+            call(
+                vcs().as_str(),
+                format!("send-email --to {to} ./patches").as_str(),
+            );
         }
         if option.eq("log") {
             call(vcs().as_str(), "log");
@@ -600,7 +638,12 @@ pub fn configure_git() -> bool {
             .arg("config")
             .arg("--global")
             .arg("user.email")
-            .arg(Text::new("email").prompt().expect("failed to get email"))
+            .arg(
+                Text::new("email")
+                    .with_validator(EmailValidator)
+                    .prompt()
+                    .expect("failed to get email"),
+            )
             .spawn()
             .expect("failed")
             .wait()
