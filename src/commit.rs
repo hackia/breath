@@ -1,4 +1,4 @@
-use crate::utils::{run_hooks, types};
+use crate::utils::{call, run_hooks, types};
 use crossterm::style::Stylize;
 use inquire::{Confirm, Editor, Select, Text};
 use std::path::Path;
@@ -348,6 +348,12 @@ pub fn commit(msg: &str) -> i32 {
         .unwrap()
         .success()
     {
+        if Path::new(".git").is_dir() {
+            call(
+                "git",
+                "format-patch --progress --output-directory patches -1 HEAD",
+            );
+        }
         0
     } else {
         eprintln!("failed to run commit");
