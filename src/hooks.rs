@@ -181,7 +181,15 @@ pub const CMAKE_HOOKS: [Hook; 1] = [Hook {
     command: "cmake . && make && make test",
 }];
 
-pub const PHP_HOOKS: [Hook; 5] = [
+pub const PHP_HOOKS: [Hook; 6] = [
+    Hook {
+        language: Language::Php,
+        description: "Checks that your PHP and extensions versions match the platform requirements of the installed packages.",
+        success: "Installed successfully on your system",
+        failure: "Failed to install requirements in your system",
+        file: "install.log",
+        command: "install",
+    },
     Hook {
         language: Language::Php,
         description: "Checks that your PHP and extensions versions match the platform requirements of the installed packages.",

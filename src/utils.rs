@@ -65,7 +65,7 @@ use tabled::settings::Style;
 /// }
 /// ```
 pub fn ok(message: &str, cmd: &mut Command, success: &str, failure: &str) -> std::io::Result<()> {
-    let mut output = Spinner::new(Spinners::Dots2, message.to_string());
+    let mut output = Spinner::new(Spinners::Line, message.to_string());
     let status = cmd
         .current_dir(".")
         .spawn()
