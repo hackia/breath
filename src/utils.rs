@@ -309,7 +309,7 @@ pub fn verify(hooks: &[Hook]) -> (bool, u128) {
 ///     configuration validation failed.
 ///
 /// # Error Handling
-/// In all cases, if a required hook verification or command fails, an error of type
+/// In all cases, if a required hook verification or command fails, an error of a type
 /// `std::io::Error` with a custom message is returned to indicate which step or
 /// environment failed.
 ///

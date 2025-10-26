@@ -1,3 +1,4 @@
+pub mod api;
 pub mod commit;
 pub mod hooks;
 pub mod utils;
@@ -6,8 +7,7 @@ use crate::commit::Zen;
 use crate::utils::{call, configure_git, configure_hg, run_hooks, zen};
 use clap::Arg;
 use std::path::Path;
-use std::process::{exit, ExitCode};
-
+use std::process::{ExitCode, exit};
 
 fn breathes() -> clap::ArgMatches {
     clap::Command::new("breath")
@@ -52,7 +52,7 @@ fn main() -> ExitCode {
                 _ => ExitCode::FAILURE,
             }
         }
-        Some(("zen",_)) => exit(zen()),
+        Some(("zen", _)) => exit(zen()),
         Some(("health", _)) => match run_hooks() {
             Ok(()) => ExitCode::SUCCESS,
             Err(_) => ExitCode::FAILURE,

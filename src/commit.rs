@@ -1,8 +1,9 @@
 use crate::utils::{run_hooks, types};
-use crossterm::style::Stylize;
-use inquire::{Confirm, Editor, Select, Text};
+use inquire::{Confirm, Editor, MultiSelect, Select, Text};
 use std::path::Path;
 use std::process::Command;
+use crossterm::style::Stylize;
+
 #[derive(Debug)]
 pub struct CommitType {
     pub category: &'static str,
@@ -354,10 +355,77 @@ pub fn commit(msg: &str) -> i32 {
         1
     }
 }
-pub const COMMIT_MESSAGE: &str = "%type%: %summary%\n\n%body%\n";
+pub const COMMIT_MESSAGE: &str = include_str!("../templates/default.txt");
 
 pub struct Zen;
 impl Zen {
+    pub fn ask_type() -> String {
+        let t = Zen::ask_select("Select commit type", types());
+        let y = t.split('~').collect::<Vec<&str>>();
+        y.first().expect("").trim_end().to_string()
+    }
+
+    pub fn ask_resolves() -> String {
+        Zen::edit("Resolves:")
+    }
+    pub fn ask_summary() -> String {
+        Zen::edit("Commit summary:")
+    }
+    pub fn ask_why() -> String {
+        Zen::edit("Why changes:")
+    }
+    pub fn ask_when() -> String {
+        Zen::edit("When changes:")
+    }
+    pub fn ask_how() -> String {
+        Zen::edit("How changes:")
+    }
+
+    pub fn ask_before() -> String {
+        Zen::edit("Before changes:")
+    }
+    pub fn ask_after() -> String {
+        Zen::edit("After changes:")
+    }
+
+    pub fn ask_requirements() -> String {
+        Zen::edit("Requirements changes:")
+    }
+    pub fn ask_notes() -> String {
+        Zen::edit("Notes for teams:")
+    }
+    pub fn edit(prompt: &str) -> String {
+        Editor::new(prompt.green().bold().to_string().as_str())
+            .prompt()
+            .expect("failed to get prompt")
+    }
+
+    pub fn ask(prompt: &str, default: &str) -> String {
+        Text::new(prompt.green().bold().to_string().as_str())
+            .with_default(default)
+            .prompt()
+            .expect("failed to get prompt")
+    }
+
+    pub fn ask_yn(prompt: &str, default: bool) -> bool {
+        Confirm::new(prompt.green().bold().to_string().as_str())
+            .with_default(default)
+            .prompt()
+            .expect("failed to get prompt")
+    }
+    pub fn ask_select(prompt: &str, options: Vec<String>) -> String {
+        Select::new(prompt.green().bold().to_string().as_str(), options)
+            .with_vim_mode(true)
+            .prompt()
+            .expect("failed to get prompt")
+    }
+    pub fn ask_multiselect(prompt: &str, options: Vec<String>) -> Vec<String> {
+        MultiSelect::new(prompt.green().bold().to_string().as_str(), options)
+            .with_vim_mode(true)
+            .prompt()
+            .expect("failed to get prompt")
+    }
+
     ///
     /// # Panics
     ///
@@ -369,38 +437,80 @@ impl Zen {
         loop {
             diff();
             add();
-            let t = Select::new(
-                "Select a type:".green().bold().to_string().as_str(),
-                types(),
-            )
-            .with_vim_mode(true)
-            .prompt()
-            .expect("failed to get type");
-            let summary = Text::new("Commit summary".green().bold().to_string().as_str())
-                .prompt()
-                .expect("failed to get summary");
-            let body = Editor::new("Explain changes:")
-                .prompt()
-                .expect("failed to get body");
-            let y = t.split('~').collect::<Vec<&str>>();
+            let mut t = Zen::ask_type();
+            while t.is_empty() {
+                t.clear();
+                t.push_str(Zen::ask_type().as_str());
+            }
+
+            let mut summary = Zen::ask_summary();
+            while summary.is_empty() {
+                summary.clear();
+                summary.push_str(Zen::ask_summary().as_str());
+            }
+            let mut why = Zen::ask_why();
+            while why.is_empty() {
+                why.clear();
+                why.push_str(Zen::ask_why().as_str());
+            }
+            let mut when = Zen::ask_when();
+            while when.is_empty() {
+                when.clear();
+                when.push_str(Zen::ask_when().as_str());
+            }
+
+            let mut how = Zen::ask_how();
+            while how.is_empty() {
+                how.clear();
+                how.push_str(Zen::ask_how().as_str());
+            }
+            let mut before = Zen::ask_before();
+            while before.is_empty() {
+                before.clear();
+                before.push_str(Zen::ask_before().as_str());
+            }
+            let mut after = Zen::ask_after();
+            while after.is_empty() {
+                after.clear();
+                after.push_str(Zen::ask_after().as_str());
+            }
+            let mut requirements = Zen::ask_requirements();
+            while requirements.is_empty() {
+                requirements.clear();
+                requirements.push_str(Zen::ask_requirements().as_str());
+            }
+            let mut notes = Zen::ask_notes();
+            while notes.is_empty() {
+                notes.clear();
+                notes.push_str(Zen::ask_notes().as_str());
+            }
+            let mut issue = Zen::ask_resolves();
+            while issue.is_empty() {
+                issue.clear();
+                issue.push_str(Zen::ask_resolves().as_str());
+            }
             let msg = COMMIT_MESSAGE
-                .replace("%type%", y.first().expect("").trim_end())
+                .replace("%type%", t.as_str())
                 .replace("%summary%", summary.trim_end())
-                .replace("%body%", body.as_str());
+                .replace("%why%", why.as_str())
+                .replace("%how%", how.as_str())
+                .replace("%when%", when.as_str())
+                .replace("%before%", before.as_str())
+                .replace("%after%", after.as_str())
+                .replace("%requirements%", requirements.as_str())
+                .replace("%notes%", notes.as_str())
+                .replace("%resolves%", issue.as_str());
             println!("\n{msg}\n");
             if Confirm::new("Use this commit message")
                 .with_default(true)
                 .prompt()
-                .expect("failed to get if ")
+                .expect("failed to get if")
                 .eq(&false)
             {
                 println!("aborted commit");
                 return 0;
             }
-            if t.is_empty() || summary.is_empty() || body.is_empty() {
-                continue;
-            }
-            return commit(format!("\n{msg}\n").as_str());
+            return commit(msg.as_str());
         }
     }
 }
