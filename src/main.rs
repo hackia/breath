@@ -1,13 +1,11 @@
-pub mod api;
 pub mod commit;
 pub mod hooks;
 pub mod utils;
 
-use crate::commit::Zen;
-use crate::utils::{call, configure_git, configure_hg, run_hooks, zen};
+use crate::commit::{Commit, vcs};
+use crate::utils::{call, run_hooks, zen};
 use clap::Arg;
-use std::path::Path;
-use std::process::{ExitCode, exit};
+use std::process::ExitCode;
 
 fn breathes() -> clap::ArgMatches {
     clap::Command::new("breath")
@@ -39,33 +37,28 @@ fn breathes() -> clap::ArgMatches {
         .get_matches()
 }
 fn main() -> ExitCode {
-    let mercurial = Path::new(".hg").is_dir();
-    let git = Path::new(".git").is_dir();
+    let mut commit = Commit::new();
     let app = breathes();
-
-    match app.subcommand() {
-        Some(("config", config)) => {
-            let vcs = config.get_one::<String>("vcs").unwrap();
-            match vcs.as_str() {
-                "git" if configure_git() => ExitCode::SUCCESS,
-                "hg" if configure_hg() => ExitCode::SUCCESS,
-                _ => ExitCode::FAILURE,
-            }
-        }
-        Some(("zen", _)) => exit(zen()),
-        Some(("health", _)) => match run_hooks() {
-            Ok(()) => ExitCode::SUCCESS,
-            Err(_) => ExitCode::FAILURE,
-        },
-        Some(("commit", _)) => match (mercurial, git) {
-            (true, _) | (_, true) => exit(Zen::commit()),
-            _ => ExitCode::FAILURE,
-        },
-        Some((cmd @ ("push" | "pull" | "status" | "log" | "diff"), _)) => match (mercurial, git) {
-            (true, _) if call("hg", cmd) => ExitCode::SUCCESS,
-            (_, true) if call("git", cmd) => ExitCode::SUCCESS,
-            _ => ExitCode::FAILURE,
-        },
-        _ => ExitCode::FAILURE,
+    if app.subcommand_matches("health").is_some() && run_hooks().is_err() {
+        return ExitCode::FAILURE;
+    }
+    if app.subcommand_matches("zen").is_some() && zen().is_err() {
+        ExitCode::FAILURE
+    } else if app.subcommand_matches("commit").is_some()
+        && run_hooks().is_ok()
+        && let Ok(c) = commit.commit()
+    {
+        println!("Commited: {c}");
+        return ExitCode::SUCCESS;
+    } else if app.subcommand_matches("push").is_some() && call(vcs().as_str(), "push") {
+        return ExitCode::SUCCESS;
+    } else if app.subcommand_matches("pull").is_some() && call(vcs().as_str(), "pull") {
+        return ExitCode::SUCCESS;
+    } else if app.subcommand_matches("status").is_some() && call(vcs().as_str(), "status") {
+        return ExitCode::SUCCESS;
+    } else if app.subcommand_matches("log").is_some() && call(vcs().as_str(), "log") {
+        return ExitCode::SUCCESS;
+    } else {
+        ExitCode::FAILURE
     }
 }

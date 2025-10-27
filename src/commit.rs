@@ -1,6 +1,8 @@
-use crate::utils::{run_hooks, types};
-use crossterm::style::Stylize;
-use inquire::{Confirm, Editor, MultiSelect, Select, Text};
+use crate::utils::types;
+use inquire::error::InquireResult;
+use inquire::{Confirm, Editor, Select, Text};
+use std::fmt::Display;
+use std::io::Error;
 use std::path::Path;
 use std::process::Command;
 
@@ -291,6 +293,7 @@ pub const COMMIT_TYPES: [CommitType; 46] = [
     },
 ];
 
+#[must_use]
 pub fn vcs() -> String {
     let mercurial = Path::new(".hg").is_dir();
     let git = Path::new(".git").is_dir();
@@ -303,214 +306,267 @@ pub fn vcs() -> String {
     };
     String::from(vcs)
 }
-
-pub fn add() {
-    assert!(
-        Command::new(vcs())
-            .arg("add")
-            .arg(".")
-            .current_dir(".")
-            .spawn()
-            .unwrap()
-            .wait()
-            .unwrap()
-            .success()
-    );
-}
-pub fn diff() {
-    if Confirm::new("show diff")
-        .with_default(true)
-        .prompt()
-        .expect("failed to get prompt")
+///
+/// # Errors
+///
+/// Return an error if the underlying VCS command fails or exits with a non-success status.
+pub fn add() -> Result<(), Error> {
+    if Command::new(vcs())
+        .arg("add")
+        .arg(".")
+        .current_dir(".")
+        .spawn()?
+        .wait()?
+        .success()
     {
-        assert!(
-            Command::new(vcs())
-                .arg("diff")
-                .arg("-p")
-                .current_dir(".")
-                .spawn()
-                .expect("vcs")
-                .wait()
-                .expect("failed")
-                .success()
-        );
+        Ok(())
+    } else {
+        Err(Error::other("failed to add files"))
+    }
+}
+/// # Errors
+///
+/// Returns an error if the underlying VCS command fails or exits with a non-success status.
+pub fn diff() -> Result<(), Error> {
+    if Command::new(vcs())
+        .arg("diff")
+        .arg("-p")
+        .current_dir(".")
+        .spawn()?
+        .wait()?
+        .success()
+    {
+        Ok(())
+    } else {
+        Err(Error::other("failed to run diff"))
     }
 }
 
-pub fn commit(msg: &str) -> i32 {
+/// # Errors
+///
+/// Returns an error if the underlying VCS command fails or exits with a non-success status.
+pub fn status() -> Result<(), Error> {
+    if Command::new(vcs())
+        .arg("status")
+        .current_dir(".")
+        .spawn()?
+        .wait()?
+        .success()
+    {
+        return Ok(());
+    }
+    Err(Error::other("failed to run status"))
+}
+
+/// # Errors
+///
+/// Returns an error if the underlying VCS `commit` command fails.
+pub fn commit(msg: &str) -> Result<i32, Error> {
     if Command::new(vcs())
         .arg("commit")
         .arg("-m")
         .arg(msg)
         .current_dir(".")
-        .spawn()
-        .expect("failed to commit")
-        .wait()
-        .expect("failed to wait")
+        .spawn()?
+        .wait()?
         .success()
     {
-        0
+        Ok(0)
     } else {
-        eprintln!("failed to run commit");
-        1
+        Err(Error::other("failed to run commit"))
     }
 }
-pub const COMMIT_MESSAGE: &str = include_str!("../templates/default.txt");
 
-pub struct Zen;
-impl Zen {
-    pub fn ask_type() -> String {
-        let t = Zen::ask_select("Select commit type", types());
-        let y = t.split('~').collect::<Vec<&str>>();
-        y.first().expect("").trim_end().to_string()
-    }
+pub struct Commit {
+    pub t: String,
+    pub summary: String,
+    pub why: String,
+    pub who: String,
+    pub when: String,
+    pub before: String,
+    pub after: String,
+    pub requirements: String,
+    pub notes: String,
+    pub resolves: Vec<String>,
+}
 
-    pub fn ask_resolves() -> String {
-        Zen::edit("Resolves:")
+impl Default for Commit {
+    fn default() -> Self {
+        Self {
+            t: String::new(),
+            summary: String::new(),
+            why: String::new(),
+            who: String::new(),
+            when: String::new(),
+            before: String::new(),
+            after: String::new(),
+            requirements: String::new(),
+            notes: String::new(),
+            resolves: Vec::new(),
+        }
     }
-    pub fn ask_summary() -> String {
-        Zen::edit("Commit summary:")
-    }
-    pub fn ask_why() -> String {
-        Zen::edit("Why changes:")
-    }
-    pub fn ask_when() -> String {
-        Zen::edit("When changes:")
-    }
-    pub fn ask_how() -> String {
-        Zen::edit("How changes:")
-    }
+}
 
-    pub fn ask_before() -> String {
-        Zen::edit("Before changes:")
+impl Display for Commit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{} ~ {}", self.t, self.summary)?;
+        writeln!(f, "## Why changes")?;
+        writeln!(f, "{}", self.why)?;
+        writeln!(f, "## Who changes")?;
+        writeln!(f, "{}", self.who)?;
+        writeln!(f, "## When changes")?;
+        writeln!(f, "{}", self.when)?;
+        writeln!(f, "## Before changes")?;
+        writeln!(f, "{}", self.before)?;
+        writeln!(f, "## After changes")?;
+        writeln!(f, "{}", self.after)?;
+        writeln!(f, "## Requirements")?;
+        writeln!(f, "{}", self.requirements)?;
+        writeln!(f, "## Teams notes")?;
+        writeln!(f, "{}", self.notes)?;
+        writeln!(f, "## Resolves")?;
+        for resolve in &self.resolves {
+            writeln!(f, "Fixes #{resolve}")?;
+        }
+        Ok(())
     }
-    pub fn ask_after() -> String {
-        Zen::edit("After changes:")
-    }
-
-    pub fn ask_requirements() -> String {
-        Zen::edit("Requirements changes:")
-    }
-    pub fn ask_notes() -> String {
-        Zen::edit("Notes for teams:")
-    }
-    pub fn edit(prompt: &str) -> String {
-        Editor::new(prompt.green().bold().to_string().as_str())
-            .prompt()
-            .expect("failed to get prompt")
-    }
-
-    pub fn ask(prompt: &str, default: &str) -> String {
-        Text::new(prompt.green().bold().to_string().as_str())
-            .with_default(default)
-            .prompt()
-            .expect("failed to get prompt")
-    }
-
-    pub fn ask_yn(prompt: &str, default: bool) -> bool {
-        Confirm::new(prompt.green().bold().to_string().as_str())
-            .with_default(default)
-            .prompt()
-            .expect("failed to get prompt")
-    }
-    pub fn ask_select(prompt: &str, options: Vec<String>) -> String {
-        Select::new(prompt.green().bold().to_string().as_str(), options)
-            .with_vim_mode(true)
-            .prompt()
-            .expect("failed to get prompt")
-    }
-    pub fn ask_multiselect(prompt: &str, options: Vec<String>) -> Vec<String> {
-        MultiSelect::new(prompt.green().bold().to_string().as_str(), options)
-            .with_vim_mode(true)
-            .prompt()
-            .expect("failed to get prompt")
-    }
-
-    ///
-    /// # Panics
-    ///
+}
+impl Commit {
     #[must_use]
-    pub fn commit() -> i32 {
-        if run_hooks().is_err() {
-            return 1;
-        }
-        loop {
-            diff();
-            add();
-            let mut t = Zen::ask_type();
-            while t.is_empty() {
-                t.clear();
-                t.push_str(Zen::ask_type().as_str());
-            }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-            let mut summary = Zen::ask_summary();
-            while summary.is_empty() {
-                summary.clear();
-                summary.push_str(Zen::ask_summary().as_str());
-            }
-            let mut why = Zen::ask_why();
-            while why.is_empty() {
-                why.clear();
-                why.push_str(Zen::ask_why().as_str());
-            }
-            let mut when = Zen::ask_when();
-            while when.is_empty() {
-                when.clear();
-                when.push_str(Zen::ask_when().as_str());
-            }
+    pub fn commit(&mut self) -> InquireResult<&mut Self> {
+        self.ask_type()?
+            .ask_summary()?
+            .ask_why()?
+            .ask_when()?
+            .ask_who()?
+            .ask_before()?
+            .ask_after()?
+            .ask_requirements()?
+            .ask_notes()?
+            .ask_resolves()
+    }
+    pub fn set_type(&mut self, t: &str) -> &mut Self {
+        self.t.clear();
+        self.t.push_str(t);
+        self
+    }
+    pub fn set_summary(&mut self, summary: &str) -> &mut Self {
+        self.summary.clear();
+        self.summary.push_str(summary);
+        self
+    }
+    pub fn set_why(&mut self, why: &str) -> &mut Self {
+        self.why.clear();
+        self.why.push_str(why);
+        self
+    }
 
-            let mut how = Zen::ask_how();
-            while how.is_empty() {
-                how.clear();
-                how.push_str(Zen::ask_how().as_str());
-            }
-            let mut before = Zen::ask_before();
-            while before.is_empty() {
-                before.clear();
-                before.push_str(Zen::ask_before().as_str());
-            }
-            let mut after = Zen::ask_after();
-            while after.is_empty() {
-                after.clear();
-                after.push_str(Zen::ask_after().as_str());
-            }
-            let mut requirements = Zen::ask_requirements();
-            while requirements.is_empty() {
-                requirements.clear();
-                requirements.push_str(Zen::ask_requirements().as_str());
-            }
-            let mut notes = Zen::ask_notes();
-            while notes.is_empty() {
-                notes.clear();
-                notes.push_str(Zen::ask_notes().as_str());
-            }
-            let mut issue = Zen::ask_resolves();
-            while issue.is_empty() {
-                issue.clear();
-                issue.push_str(Zen::ask_resolves().as_str());
-            }
-            let msg = COMMIT_MESSAGE
-                .replace("%type%", t.as_str())
-                .replace("%summary%", summary.trim_end())
-                .replace("%why%", why.as_str())
-                .replace("%how%", how.as_str())
-                .replace("%when%", when.as_str())
-                .replace("%before%", before.as_str())
-                .replace("%after%", after.as_str())
-                .replace("%requirements%", requirements.as_str())
-                .replace("%notes%", notes.as_str())
-                .replace("%resolves%", issue.as_str());
-            println!("\n{msg}\n");
-            if Confirm::new("Use this commit message")
-                .with_default(true)
-                .prompt()
-                .expect("failed to get if")
-                .eq(&false)
-            {
-                println!("aborted commit");
-                return 0;
-            }
-            return commit(msg.as_str());
+    pub fn set_when(&mut self, when: &str) -> &mut Self {
+        self.when.clear();
+        self.when.push_str(when);
+        self
+    }
+    pub fn set_who(&mut self, who: &str) -> &mut Self {
+        self.who.clear();
+        self.who.push_str(who);
+        self
+    }
+    pub fn set_before(&mut self, before: &str) -> &mut Self {
+        self.before.clear();
+        self.before.push_str(before);
+        self
+    }
+    pub fn set_after(&mut self, after: &str) -> &mut Self {
+        self.after.clear();
+        self.after.push_str(after);
+        self
+    }
+    pub fn set_requirements(&mut self, requirements: &str) -> &mut Self {
+        self.requirements.clear();
+        self.requirements.push_str(requirements);
+        self
+    }
+    pub fn add_resolve(&mut self, resolve: &str) -> &mut Self {
+        self.resolves.clear();
+        self.resolves.push(resolve.to_string());
+        self
+    }
+    pub fn ask_notes(&mut self) -> InquireResult<&mut Self> {
+        self.notes.clear();
+        self.notes
+            .push_str(Editor::new("The teams notes:").prompt()?.as_str());
+        Ok(self)
+    }
+
+    pub fn ask_type(&mut self) -> InquireResult<&mut Self> {
+        self.t
+            .push_str(Select::new("Commit types", types()).prompt()?.as_str());
+        Ok(self)
+    }
+
+    pub fn ask_summary(&mut self) -> InquireResult<&mut Self> {
+        self.summary.clear();
+        self.summary
+            .push_str(Text::new("Commit summary:").prompt()?.as_str());
+        Ok(self)
+    }
+    pub fn ask_why(&mut self) -> InquireResult<&mut Self> {
+        self.why.clear();
+        self.why.push_str(
+            Editor::new("Why are you making this change:")
+                .prompt()?
+                .as_str(),
+        );
+        Ok(self)
+    }
+    pub fn ask_who(&mut self) -> InquireResult<&mut Self> {
+        self.who.clear();
+        self.who.push_str(
+            Text::new("Who are you:")
+                .with_default(env!("USER"))
+                .prompt()?
+                .as_str(),
+        );
+        Ok(self)
+    }
+
+    pub fn ask_when(&mut self) -> InquireResult<&mut Self> {
+        self.when.push_str(
+            Text::new("When are you making this change:")
+                .prompt()?
+                .as_str(),
+        );
+        Ok(self)
+    }
+
+    pub fn ask_before(&mut self) -> InquireResult<&mut Self> {
+        self.before
+            .push_str(Editor::new("Before making this change:").prompt()?.as_str());
+        Ok(self)
+    }
+
+    pub fn ask_after(&mut self) -> InquireResult<&mut Self> {
+        self.after
+            .push_str(Text::new("After making this change:").prompt()?.as_str());
+        Ok(self)
+    }
+    pub fn ask_requirements(&mut self) -> InquireResult<&mut Self> {
+        self.requirements.clear();
+        self.requirements
+            .push_str(Editor::new("Requirements:").prompt()?.as_str());
+        Ok(self)
+    }
+    pub fn ask_resolves(&mut self) -> InquireResult<&mut Self> {
+        self.resolves
+            .push(Text::new("Resolves:").prompt()?.as_str().to_string());
+        while Confirm::new("Add another resolve?").prompt()? {
+            self.resolves
+                .push(Text::new("Resolves:").prompt()?.as_str().to_string());
         }
+        Ok(self)
     }
 }

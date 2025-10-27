@@ -1,10 +1,10 @@
-use crate::commit::{COMMIT_TYPES, Zen, diff, vcs};
+use crate::commit::{COMMIT_TYPES, diff, vcs};
 use crate::hooks::Language::CSharp;
 use crate::hooks::{Hook, LANGUAGES, Language};
 use crossterm::style::Stylize;
 use glob::glob;
 use inquire::validator::{StringValidator, Validation};
-use inquire::{Confirm, CustomUserError, MultiSelect, Select, Text};
+use inquire::{Confirm, CustomUserError, InquireError, Select, Text};
 use lazy_static::lazy_static;
 use regex::Regex;
 use spinners::{Spinner, Spinners};
@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::fs::{File, create_dir_all};
 use std::io::Error;
 use std::path::{MAIN_SEPARATOR_STR, Path};
-use std::process::Command;
+use std::process::{Command, exit};
 use std::time::Instant;
 use tabled::settings::Style;
 
@@ -103,9 +103,9 @@ pub fn ok(message: &str, cmd: &mut Command, success: &str, failure: &str) -> std
         Err(Error::other(failure))
     }
 }
-
+#[must_use]
 pub fn call(program: &str, arg: &str) -> bool {
-    Command::new(program)
+    if !Command::new(program)
         .args(arg.split_whitespace())
         .current_dir(".")
         .spawn()
@@ -113,6 +113,11 @@ pub fn call(program: &str, arg: &str) -> bool {
         .wait()
         .expect("Fail to execute command")
         .success()
+    {
+        eprintln!("{program} not founded");
+        exit(1);
+    }
+    true
 }
 
 /// Returns a sorted list of formatted commit type strings.
@@ -219,38 +224,34 @@ pub fn types() -> Vec<String> {
 ///
 /// - `crossterm` for terminal manipulation.
 /// - `cargo` commands for project verification.
-/// - Logs are written to the `.breathes ` directory for each respective check.
-#[must_use]
-pub fn verify(hooks: Vec<Hook>) -> (bool, u128) {
+/// - Logs are written to the `breathes ` directory for each respective check.
+pub fn verify(hooks: Vec<Hook>) -> Result<(bool, u128), Error> {
     let start = Instant::now();
-    create_dir_all(".breathes").expect("Fail to create .breathes directory");
     let mut status: Vec<bool> = Vec::new();
+
+    create_dir_all("breathes")?;
+
     for hook in &hooks {
-        create_dir_all(format!(".breathes{MAIN_SEPARATOR_STR}{}", hook.language))
-            .expect("Fail to create .breathes/out_dir directory");
+        create_dir_all(format!("breathes{MAIN_SEPARATOR_STR}{}", hook.language))?;
         create_dir_all(format!(
-            ".breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stdout",
+            "breathes{MAIN_SEPARATOR_STR}{}/stdout",
             hook.language
-        ))
-        .expect("Fail to create .breathes/out_dir directory");
+        ))?;
         create_dir_all(format!(
-            ".breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stderr",
+            "breathes{MAIN_SEPARATOR_STR}{}/stderr",
             hook.language
-        ))
-        .expect("Fail to create .breathes/out_dir directory");
+        ))?;
 
         if ok(
             hook.description,
             Command::new("sh").arg("-c")
-                .args(hook.command.split_whitespace())
+                .arg(hook.command)
                 .current_dir(".")
                 .stderr(
-                    File::create(format!(".breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stderr{MAIN_SEPARATOR_STR}{}", hook.language, hook.file))
-                        .expect("Failed to create file"),
+                    File::create(format!("breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stderr{MAIN_SEPARATOR_STR}{}", hook.language, hook.file))?
                 )
                 .stdout(
-                    File::create(format!(".breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stdout{MAIN_SEPARATOR_STR}{}", hook.language, hook.file))
-                        .expect("Failed to create file"),
+                    File::create(format!("breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stdout{MAIN_SEPARATOR_STR}{}", hook.language, hook.file))?
                 ),
             hook.success,
             hook.failure,
@@ -262,10 +263,10 @@ pub fn verify(hooks: Vec<Hook>) -> (bool, u128) {
             status.push(true);
         }
     }
-    (
+    Ok((
         status.contains(&false).eq(&false),
         start.elapsed().as_millis(),
-    )
+    ))
 }
 
 /// Runs a set of predefined checks or hooks depending on the existence of certain project configuration files.
@@ -335,13 +336,12 @@ pub fn verify(hooks: Vec<Hook>) -> (bool, u128) {
 ///   These must be defined appropriately outside the scope of this function.
 /// - The function performs validation by matching file paths at the root of the project. Ensure
 ///   the function is executed in the appropriate working directory.
-///
-pub fn run_hooks() -> Result<(), Error> {
+pub fn run_hooks() -> Result<i32, Error> {
     let start = Instant::now();
     let mut response: Vec<bool> = Vec::new();
     let l = detect();
     if l.is_empty() {
-        return Err(Error::other("No language detected or supported"));
+        return Err(Error::other("No language detected"));
     }
     let mut all: HashMap<String, (bool, u128)> = HashMap::new();
     let mut table = tabled::builder::Builder::default();
@@ -349,30 +349,13 @@ pub fn run_hooks() -> Result<(), Error> {
     for language in &l {
         table.push_record([language.to_string()]);
     }
-    let mut x = table.build();
-    println!("{}", x.with(Style::modern_rounded()));
-    if Confirm::new("Check all")
-        .with_default(true)
-        .prompt()
-        .expect("failed to get response")
-    {
-        for lang in &l {
-            run_hook(lang.clone(), &mut all);
-        }
-    } else {
-        let mut languages: Vec<String>;
-        loop {
-            languages = MultiSelect::new("Select the languages to test", l.iter().map(|x|x.to_string()).collect::<Vec<String>>())
-                .prompt()
-                .expect("failed to get language");
-            if !languages.is_empty() {
-                break;
-            }
-        }
-        for lang in &languages {
-            run_hook(Language::from(lang.clone()), &mut all);
+
+    for lang in &l {
+        if run_hook(lang.clone(), &mut all).is_err() {
+            return Err(Error::other("Failed to run hook"));
         }
     }
+
     let mut table = tabled::builder::Builder::default();
     table.push_record(["Language", "Status", "Take"]);
     for (language, &status) in &all {
@@ -408,12 +391,11 @@ pub fn run_hooks() -> Result<(), Error> {
 
     println!("{}", report.with(Style::modern_rounded()));
     if response.contains(&false) {
-        return Err(Error::other("some check is not valid"));
+        return Err(Error::other("Some checks failed."));
     }
-    Ok(())
+    Ok(0)
 }
-
-pub fn zen() -> i32 {
+pub fn zen() -> Result<i32, InquireError> {
     let mut options = vec![
         "add",
         "patch_send",
@@ -424,7 +406,7 @@ pub fn zen() -> i32 {
         "commit",
         "list_tags",
         "add_tag",
-        "hooks",
+        "health",
         "status",
         "push",
         "pull",
@@ -433,107 +415,141 @@ pub fn zen() -> i32 {
     ];
     options.sort();
     loop {
-        let option = Select::new("wishes", options.to_vec()).prompt().expect("");
+        let option = Select::new("wishes", options.to_vec()).prompt()?;
         if option.eq("add") {
-            call(vcs().as_str(), "add .");
+            if call(vcs().as_str(), "add .").eq(&false) {
+                return Err(InquireError::from(Error::other(
+                    "Failed to add files to repository",
+                )));
+            }
         }
         if option.eq("patch_send") && Path::new(".git").is_dir() {
             let mut to = String::new();
-            loop {
-                to.clear();
+            while to.is_empty() {
                 to.push_str(
                     Text::new("to")
                         .with_validator(EmailValidator)
-                        .prompt()
-                        .expect("to missing")
+                        .prompt()?
                         .as_str(),
                 );
-                if !to.is_empty() {
-                    break;
-                }
             }
-            call(
+            if call(
                 vcs().as_str(),
                 format!("send-email --to {to} ./patches").as_str(),
-            );
+            )
+            .eq(&false)
+            {
+                return Err(InquireError::from(Error::other("Failed to send email")));
+            }
         }
         if option.eq("email") {
-            call("aerc", "");
+            if call("aerc", "").eq(&false) {
+                return Err(InquireError::from(Error::other(
+                    "Failed to run aerc email client",
+                )));
+            }
         }
         if option.eq("log") {
-            call(vcs().as_str(), "log");
+            if call(vcs().as_str(), "log").eq(&false) {
+                return Err(InquireError::from(Error::other(
+                    "Failed to run log command",
+                )));
+            }
         }
         if option.eq("add_tag") && Path::new(".git").is_dir() {
-            call(
-                vcs().as_str(),
-                format!(
-                    "tag -m {} -a {}",
-                    Text::new("specifies an annotated tagging message")
-                        .prompt()
-                        .expect("specifies a tagging message")
-                        .as_str(),
-                    Text::new("annotated tag version")
-                        .prompt()
-                        .expect("specifies a tagging message")
-                        .as_str(),
-                )
-                .as_str(),
-            );
-        }
+            let mut tag = String::new();
+            let mut message = String::new();
 
-        if option.eq("add_tag") && Path::new(".hg").is_dir() {
-            call(
-                vcs().as_str(),
-                format!(
-                    "tag {}",
-                    Text::new("specifies a tagging message")
-                        .prompt()
-                        .expect("specifies a tagging message")
+            while tag.is_empty() {
+                tag.push_str(
+                    Text::new("Specifies a tag annotated version")
+                        .prompt()?
                         .as_str(),
-                )
-                .as_str(),
-            );
+                );
+            }
+            while message.is_empty() {
+                message.push_str(
+                    Text::new("Specifies a tag annotation message")
+                        .prompt()?
+                        .as_str(),
+                );
+            }
+            if call(
+                vcs().as_str(),
+                format!("tag -a {tag} -m {message}").as_str(),
+            ) {
+                eprintln!("Failed to add tag.");
+                return Err(InquireError::from(Error::other("Failed to add tag")));
+            }
+        }
+        if option.eq("add_tag") && Path::new(".hg").is_dir() {
+            let mut tag = String::new();
+            while tag.is_empty() {
+                tag.clear();
+                tag.push_str(Text::new("specifies a tagging message").prompt()?.as_str());
+            }
+            if call(vcs().as_str(), format!("tag {tag}",).as_str()) {
+                eprintln!("Failed to add tag.");
+                return Err(InquireError::from(Error::other("Failed to add tag")));
+            }
         }
 
         if option.eq("clone") {
-            call(
-                vcs().as_str(),
-                format!(
-                    "clone {}",
+            let mut url = String::new();
+            while url.is_empty() {
+                url.clear();
+                url.push_str(
                     Text::new("specifies the repository clone url")
-                        .prompt()
-                        .expect("specifies a tagging message")
+                        .prompt()?
                         .as_str(),
-                )
-                .as_str(),
-            );
+                );
+            }
+            if call(vcs().as_str(), format!("clone {url}",).as_str()).eq(&false) {
+                return Err(InquireError::from(Error::other(
+                    "Failed to clone repository",
+                )));
+            }
         }
         if option.eq("quit") {
-            return 0;
+            return Ok(0);
         }
         if option.eq("edit") {
-            call("broot", ".");
+            if call("broot", ".").eq(&false) {
+                return Err(InquireError::from(Error::other("Failed to run broot")));
+            }
         }
         if option.eq("list_tags") {
-            call(vcs().as_str(), "tag");
+            if call(vcs().as_str(), "tag").eq(&false) {
+                return Err(InquireError::from(Error::other("Failed to list tags")));
+            }
         }
         if option.eq("status") {
-            call(vcs().as_str(), "status");
+            if call(vcs().as_str(), "status").eq(&false) {
+                return Err(InquireError::from(Error::other("Failed to list status")));
+            }
         }
         if option.eq("diff") {
-            diff();
+            if diff().is_err() {
+                return Err(InquireError::from(Error::other("Failed to diff")));
+            }
         }
-        if option.eq("commit") {
-            let _ = Zen::commit();
-        }
-        if option.eq("hooks") {
-            let _ = run_hooks();
+        if option.eq("commit") {}
+        if option.eq("health") {
+            if run_hooks()?.eq(&1) {
+                return Err(InquireError::from(Error::other(
+                    "Failed to run health checks",
+                )));
+            }
         }
         if option.eq("push") {
-            call(vcs().as_str(), "push");
+            if call(vcs().as_str(), "push").eq(&false) {
+                return Err(InquireError::from(Error::other("Failed to push")));
+            }
         }
         if option.eq("pull") {
-            call(vcs().as_str(), "pull");
+            if call(vcs().as_str(), "pull").eq(&false) {
+                return Err(InquireError::from(Error::other("Failed to pull")));
+            }
         }
         if Confirm::new("Quit")
             .with_default(false)
@@ -541,121 +557,42 @@ pub fn zen() -> i32 {
             .expect("fail to get")
             .eq(&true)
         {
-            return 0;
+            return Ok(0);
         }
     }
 }
-fn run_hook(lang: Language, all: &mut HashMap<String, (bool, u128)>) {
+fn run_hook(lang: Language, all: &mut HashMap<String, (bool, u128)>) -> Result<(), Error> {
     let hooks = Hook::get(lang.clone());
-    all.insert(lang.to_string(), verify(hooks));
-    ()
+    all.insert(lang.to_string(), verify(hooks)?);
+    Ok(())
 }
-
-fn add_if_exists(file: &str, language: Language, vec: &mut Vec<Language>) {
-    if language == CSharp {
-        let files = glob(file).expect("Failed to read glob pattern");
-        for entry in files {
-            if let Ok(path) = entry {
-                if path.is_file() {
-                    vec.push(language.clone());
+fn add_if_exists(file: &str, language: Language, vec: &mut Vec<Language>) -> Result<(), Error> {
+    if language == CSharp
+        && let Ok(files) = glob(file)
+    {
+        for file in files {
+            if let Ok(file) = file {
+                if file.is_file() {
+                    vec.push(language);
                 }
             }
         }
-    } else if Path::new(file).exists() && Path::new(file).is_file() {
-        vec.push(language.clone());
+        Ok(())
+    } else {
+        if Path::new(file).is_file() {
+            vec.push(language);
+        }
+        Ok(())
     }
 }
+#[must_use]
 pub fn detect() -> Vec<Language> {
     let mut all: Vec<Language> = Vec::new();
     for (l, file) in &LANGUAGES {
-        add_if_exists(file, l.clone(), &mut all);
+        if let Err(_) = add_if_exists(file, *l, &mut all) {
+            eprintln!("Failed to detect language.");
+            return all;
+        }
     }
     all
-}
-/// Configures Git with global settings for username, email, and editor.
-///
-/// This function uses the command-line `git config` utility to set the global
-/// Git configuration values for `user.name`, `user.email`, and `core.editor`.
-/// Each configuration value is provided interactively by prompting the user
-/// for input.
-///
-/// # Steps
-/// - Prompts the user for their Git username and sets it using `git config --global user.name`.
-/// - Prompts the user for their Git email and sets it using `git config --global user.email`.
-/// - Prompts the user for their preferred text editor and sets it using `git config --global core.editor`.
-///
-/// # Panics
-/// - If any of the configuration commands fail to execute or if the user input prompt fails.
-/// # Returns
-/// Returns `true` if all three configuration commands complete successfully,
-/// and `false` if any of the commands fail.
-///
-/// # Errors
-/// This function will panic if:
-/// - A username, email, or editor cannot be successfully retrieved from the user input prompt.
-/// - A command to configure one of the settings with Git fails to spawn, wait, or execute.
-///
-/// # Must Use
-/// This function is annotated with `#[must_use]` to ensure that callers handle
-/// the result (e.g., to confirm whether the configuration was successful).
-///
-/// # Example
-/// ```
-/// if configure_git() {
-///     println!("Git successfully configured!");
-/// } else {
-///     eprintln!("Failed to configure Git.");
-/// }
-/// ```
-///
-/// # Dependencies
-/// This function relies on external command execution and requires that:
-/// - The `git` command-line tool is installed and available in the system's PATH.
-/// - The `prompt` functionality (likely provided by the `Text` crate or input handler) is implemented and operational.
-#[must_use]
-pub fn configure_git() -> bool {
-    Command::new("git")
-        .arg("config")
-        .arg("--global")
-        .arg("user.name")
-        .arg(
-            Text::new("username")
-                .prompt()
-                .expect("failed to get username"),
-        )
-        .spawn()
-        .expect("failed")
-        .wait()
-        .expect("failed")
-        .success()
-        && Command::new("git")
-            .arg("config")
-            .arg("--global")
-            .arg("user.email")
-            .arg(
-                Text::new("email")
-                    .with_validator(EmailValidator)
-                    .prompt()
-                    .expect("failed to get email"),
-            )
-            .spawn()
-            .expect("failed")
-            .wait()
-            .expect("failed")
-            .success()
-        && Command::new("git")
-            .arg("config")
-            .arg("--global")
-            .arg("core.editor")
-            .arg(Text::new("editor").prompt().expect("failed to get editor"))
-            .spawn()
-            .expect("failed")
-            .wait()
-            .expect("failed")
-            .success()
-}
-#[must_use]
-pub fn configure_hg() -> bool {
-    println!("run command hg config --edit manually");
-    true
 }
