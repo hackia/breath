@@ -36,29 +36,51 @@ fn breathes() -> clap::ArgMatches {
         )
         .get_matches()
 }
+
 fn main() -> ExitCode {
     let mut commit = Commit::new();
     let app = breathes();
-    if app.subcommand_matches("health").is_some() && run_hooks().is_err() {
-        return ExitCode::FAILURE;
-    }
-    if app.subcommand_matches("zen").is_some() && zen().is_err() {
-        ExitCode::FAILURE
-    } else if app.subcommand_matches("commit").is_some()
-        && run_hooks().is_ok()
-        && let Ok(c) = commit.commit()
-    {
-        println!("Commited: {c}");
-        return ExitCode::SUCCESS;
-    } else if app.subcommand_matches("push").is_some() && call(vcs().as_str(), "push") {
-        return ExitCode::SUCCESS;
-    } else if app.subcommand_matches("pull").is_some() && call(vcs().as_str(), "pull") {
-        return ExitCode::SUCCESS;
-    } else if app.subcommand_matches("status").is_some() && call(vcs().as_str(), "status") {
-        return ExitCode::SUCCESS;
-    } else if app.subcommand_matches("log").is_some() && call(vcs().as_str(), "log") {
-        return ExitCode::SUCCESS;
-    } else {
-        ExitCode::FAILURE
+
+    match app.subcommand() {
+        Some(("health", _)) => {
+            if run_hooks().is_err() {
+                ExitCode::FAILURE
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
+        Some(("zen", _)) => {
+            if zen().is_err() {
+                ExitCode::FAILURE
+            } else {
+                ExitCode::SUCCESS
+            }
+        }
+        Some(("commit", _)) => {
+            if run_hooks().is_ok() {
+                if let Ok(c) = commit.commit() {
+                    println!("Commited: {c}");
+                    ExitCode::SUCCESS
+                } else {
+                    // L'utilisateur a probablement annulé
+                    ExitCode::FAILURE
+                }
+            } else {
+                // Les hooks ont échoué
+                ExitCode::FAILURE
+            }
+        }
+        // Ce bloc corrige toutes les erreurs de répétition
+        Some((cmd @ ("push" | "pull" | "status" | "log" | "diff"), _)) => {
+            if call(vcs().as_str(), cmd) {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            }
+        }
+        // Note: Tu as supprimé la logique pour "config"
+        // Si tu veux la rajouter, il faudra un bras de match pour "config"
+        // et ré-importer configure_git / configure_hg
+        _ => ExitCode::FAILURE,
     }
 }
