@@ -1,8 +1,8 @@
 use crate::utils::{run_hooks, types};
+use crossterm::style::Stylize;
 use inquire::{Confirm, Editor, MultiSelect, Select, Text};
 use std::path::Path;
 use std::process::Command;
-use crossterm::style::Stylize;
 
 #[derive(Debug)]
 pub struct CommitType {

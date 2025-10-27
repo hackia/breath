@@ -1,9 +1,8 @@
 use crate::commit::{COMMIT_TYPES, Zen, diff, vcs};
-use crate::hooks::{
-    CMAKE_HOOKS, CSHARP_HOOKS, GO_HOOKS, Hook, JAVA_HOOKS, LANGUAGES, Language, NODE_HOOKS,
-    PHP_HOOKS, RUST_HOOKS,
-};
+use crate::hooks::Language::CSharp;
+use crate::hooks::{Hook, LANGUAGES, Language};
 use crossterm::style::Stylize;
+use glob::glob;
 use inquire::validator::{StringValidator, Validation};
 use inquire::{Confirm, CustomUserError, MultiSelect, Select, Text};
 use lazy_static::lazy_static;
@@ -222,11 +221,11 @@ pub fn types() -> Vec<String> {
 /// - `cargo` commands for project verification.
 /// - Logs are written to the `.breathes ` directory for each respective check.
 #[must_use]
-pub fn verify(hooks: &[Hook]) -> (bool, u128) {
+pub fn verify(hooks: Vec<Hook>) -> (bool, u128) {
     let start = Instant::now();
     create_dir_all(".breathes").expect("Fail to create .breathes directory");
     let mut status: Vec<bool> = Vec::new();
-    for hook in hooks {
+    for hook in &hooks {
         create_dir_all(format!(".breathes{MAIN_SEPARATOR_STR}{}", hook.language))
             .expect("Fail to create .breathes/out_dir directory");
         create_dir_all(format!(
@@ -358,12 +357,12 @@ pub fn run_hooks() -> Result<(), Error> {
         .expect("failed to get response")
     {
         for lang in &l {
-            run_hook(lang.as_str(), &mut all);
+            run_hook(lang.clone(), &mut all);
         }
     } else {
         let mut languages: Vec<String>;
         loop {
-            languages = MultiSelect::new("Select the languages to test", l.to_vec())
+            languages = MultiSelect::new("Select the languages to test", l.iter().map(|x|x.to_string()).collect::<Vec<String>>())
                 .prompt()
                 .expect("failed to get language");
             if !languages.is_empty() {
@@ -371,7 +370,7 @@ pub fn run_hooks() -> Result<(), Error> {
             }
         }
         for lang in &languages {
-            run_hook(lang.as_str(), &mut all);
+            run_hook(Language::from(lang.clone()), &mut all);
         }
     }
     let mut table = tabled::builder::Builder::default();
@@ -546,37 +545,28 @@ pub fn zen() -> i32 {
         }
     }
 }
-fn run_hook(lang: &str, all: &mut HashMap<String, (bool, u128)>) {
-    if lang == "Java" {
-        all.insert(lang.to_string(), verify(&JAVA_HOOKS));
-    }
-    if lang == "CSharp" {
-        all.insert(lang.to_string(), verify(&CSHARP_HOOKS));
-    }
-    if lang == "Php" {
-        all.insert(lang.to_string(), verify(&PHP_HOOKS));
-    }
-    if lang == "Node" {
-        all.insert(lang.to_string(), verify(&NODE_HOOKS));
-    }
-    if lang == "Go" {
-        all.insert(lang.to_string(), verify(&GO_HOOKS));
-    }
-    if lang == "Rust" {
-        all.insert(lang.to_string(), verify(&RUST_HOOKS));
-    }
-    if lang == "CMake" {
-        all.insert(lang.to_string(), verify(&CMAKE_HOOKS));
-    }
+fn run_hook(lang: Language, all: &mut HashMap<String, (bool, u128)>) {
+    let hooks = Hook::get(lang.clone());
+    all.insert(lang.to_string(), verify(hooks));
+    ()
 }
 
-fn add_if_exists(file: &str, language: Language, vec: &mut Vec<String>) {
-    if Path::new(file).exists() {
-        vec.push(language.to_string());
+fn add_if_exists(file: &str, language: Language, vec: &mut Vec<Language>) {
+    if language == CSharp {
+        let files = glob(file).expect("Failed to read glob pattern");
+        for entry in files {
+            if let Ok(path) = entry {
+                if path.is_file() {
+                    vec.push(language.clone());
+                }
+            }
+        }
+    } else if Path::new(file).exists() && Path::new(file).is_file() {
+        vec.push(language.clone());
     }
 }
-pub fn detect() -> Vec<String> {
-    let mut all: Vec<String> = Vec::new();
+pub fn detect() -> Vec<Language> {
+    let mut all: Vec<Language> = Vec::new();
     for (l, file) in &LANGUAGES {
         add_if_exists(file, l.clone(), &mut all);
     }
