@@ -1,20 +1,25 @@
-use crate::commit::{COMMIT_TYPES, diff, vcs};
+use crate::commit::{COMMIT_TYPES, vcs};
 use crate::hooks::Language::CSharp;
 use crate::hooks::{Hook, LANGUAGES, Language};
 use crossterm::style::Stylize;
 use glob::glob;
 use inquire::validator::{StringValidator, Validation};
-use inquire::{Confirm, CustomUserError, InquireError, Select, Text};
+use inquire::{CustomUserError, InquireError, Select};
 use lazy_static::lazy_static;
 use regex::Regex;
 use spinners::{Spinner, Spinners};
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::fs::{File, create_dir_all};
 use std::io::Error;
 use std::path::{MAIN_SEPARATOR_STR, Path};
-use std::process::{Command, exit};
+use std::process::Command;
 use std::time::Instant;
 use tabled::settings::Style;
+
+pub const OK: i32 = 7;
+pub const KO: i32 = 8;
+pub const QUIT: i32 = 0;
 
 lazy_static! {
     static ref EMAIL_REGEX: Regex =
@@ -82,17 +87,12 @@ impl StringValidator for EmailValidator {
 ///     )
 /// }
 /// ```
-pub fn ok(message: &str, cmd: &mut Command, success: &str, failure: &str) -> std::io::Result<()> {
+pub fn ok(message: &str, cmd: &mut Command, success: &str, failure: &str) -> Result<(), Error> {
     let mut output = Spinner::new(Spinners::Line, message.white().to_string());
-    let status = cmd
-        .current_dir(".")
-        .spawn()
-        .expect("Fail to spawn thread")
-        .wait()
-        .expect("fail to wait for thread")
-        .code()
-        .expect("fail to get exit code");
-    if status.eq(&0) {
+    let status = cmd.current_dir(".").spawn()?.wait()?.code();
+    if let Some(response) = status
+        && response.eq(&0)
+    {
         output.stop_and_persist(
             "✓".green().to_string().as_str(),
             success.dark_cyan().to_string(),
@@ -103,21 +103,25 @@ pub fn ok(message: &str, cmd: &mut Command, success: &str, failure: &str) -> std
         Err(Error::other(failure))
     }
 }
-#[must_use]
-pub fn call(program: &str, arg: &str) -> bool {
+///
+/// Call git or mercurial with arg
+///
+/// # Errors
+///
+/// On failure to execute the command
+///
+pub fn call(program: &str, arg: &str) -> Result<i32, Error> {
     if !Command::new(program)
         .args(arg.split_whitespace())
         .current_dir(".")
-        .spawn()
-        .expect("Fail to execute command")
-        .wait()
-        .expect("Fail to execute command")
+        .spawn()?
+        .wait()?
         .success()
     {
         eprintln!("{program} not founded");
-        exit(1);
+        return Err(Error::other(format!("{program} not founded")));
     }
-    true
+    Ok(OK)
 }
 
 /// Returns a sorted list of formatted commit type strings.
@@ -214,24 +218,23 @@ pub fn types() -> Vec<String> {
 /// }
 /// ```
 ///
-/// ### Errors
+/// # Errors
 /// - If there is an issue reading the command's stderr output.
 /// - If there is an issue executing a command.
 /// - If there is an issue creating a file.
 /// - If there is an issue clearing the terminal screen.
 /// - If there is an issue writing to a file.
-/// ### Dependencies
+/// # Dependencies
 ///
 /// - `crossterm` for terminal manipulation.
 /// - `cargo` commands for project verification.
-/// - Logs are written to the `breathes ` directory for each respective check.
-pub fn verify(hooks: Vec<Hook>) -> Result<(bool, u128), Error> {
+/// - Logs are written to the `breathes ` directory for each respective check
+///
+pub fn verify(hooks: &[Hook]) -> Result<(bool, u128), Error> {
     let start = Instant::now();
     let mut status: Vec<bool> = Vec::new();
-
     create_dir_all("breathes")?;
-
-    for hook in &hooks {
+    for hook in hooks {
         create_dir_all(format!("breathes{MAIN_SEPARATOR_STR}{}", hook.language))?;
         create_dir_all(format!(
             "breathes{MAIN_SEPARATOR_STR}{}/stdout",
@@ -338,25 +341,22 @@ pub fn verify(hooks: Vec<Hook>) -> Result<(bool, u128), Error> {
 ///   the function is executed in the appropriate working directory.
 pub fn run_hooks() -> Result<i32, Error> {
     let start = Instant::now();
+    let mut all: HashMap<String, (bool, u128)> = HashMap::new();
+    let mut table = tabled::builder::Builder::default();
     let mut response: Vec<bool> = Vec::new();
     let l = detect();
     if l.is_empty() {
         return Err(Error::other("No language detected"));
     }
-    let mut all: HashMap<String, (bool, u128)> = HashMap::new();
-    let mut table = tabled::builder::Builder::default();
     table.push_record(["Detected"]);
     for language in &l {
         table.push_record([language.to_string()]);
     }
-
     for lang in &l {
-        if run_hook(lang.clone(), &mut all).is_err() {
+        if run_hook(*lang, &mut all).is_err() {
             return Err(Error::other("Failed to run hook"));
         }
     }
-
-    let mut table = tabled::builder::Builder::default();
     table.push_record(["Language", "Status", "Take"]);
     for (language, &status) in &all {
         response.push(status.0);
@@ -388,182 +388,100 @@ pub fn run_hooks() -> Result<i32, Error> {
         ]);
     }
     let mut report = table.build();
-
     println!("{}", report.with(Style::modern_rounded()));
     if response.contains(&false) {
         return Err(Error::other("Some checks failed."));
     }
     Ok(0)
 }
-pub fn zen() -> Result<i32, InquireError> {
-    let mut options = vec![
-        "add",
-        "patch_send",
-        "log",
-        "clone",
-        "diff",
-        "email",
-        "commit",
-        "list_tags",
-        "add_tag",
-        "health",
-        "status",
-        "push",
-        "pull",
-        "edit",
-        "quit",
+
+#[must_use]
+pub fn zen_menu() -> Vec<ZenOption> {
+    let mut x = vec![
+        ZenOption::Exit,
+        ZenOption::Add,
+        ZenOption::Health,
+        ZenOption::Log,
+        ZenOption::Diff,
+        ZenOption::Email,
+        ZenOption::ListTags,
     ];
-    options.sort();
+    x.sort_unstable();
+    x
+}
+
+impl Display for ZenOption {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Exit => write!(f, "Exit"),
+            Self::Add => write!(f, "Add"),
+            Self::Health => write!(f, "Health"),
+            Self::Log => write!(f, "Log"),
+            Self::Diff => write!(f, "Diff"),
+            Self::Email => write!(f, "Email"),
+            Self::ListTags => write!(f, "List Tags"),
+            Self::Status => write!(f, "Status"),
+        }
+    }
+}
+
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Clone)]
+pub enum ZenOption {
+    Exit,
+    Add,
+    Health,
+    Log,
+    Diff,
+    Email,
+    Status,
+    ListTags,
+}
+impl From<&str> for ZenOption {
+    fn from(value: &str) -> Self {
+        match value {
+            "Add" => Self::Add,
+            "Health" => Self::Health,
+            "Log" => Self::Log,
+            "Diff" => Self::Diff,
+            "Email" => Self::Email,
+            "ListTags" => Self::ListTags,
+            "Quit" => Self::Exit,
+            _ => Self::Health,
+        }
+    }
+}
+
+///
+/// Interact with the developer.
+///
+/// # Errors
+///
+/// On bad input
+///
+pub fn zen() -> Result<i32, InquireError> {
     loop {
-        let option = Select::new("wishes", options.to_vec()).prompt()?;
-        if option.eq("add") {
-            if call(vcs().as_str(), "add .").eq(&false) {
-                return Err(InquireError::from(Error::other(
-                    "Failed to add files to repository",
-                )));
-            }
-        }
-        if option.eq("patch_send") && Path::new(".git").is_dir() {
-            let mut to = String::new();
-            while to.is_empty() {
-                to.push_str(
-                    Text::new("to")
-                        .with_validator(EmailValidator)
-                        .prompt()?
-                        .as_str(),
-                );
-            }
-            if call(
-                vcs().as_str(),
-                format!("send-email --to {to} ./patches").as_str(),
-            )
-            .eq(&false)
-            {
-                return Err(InquireError::from(Error::other("Failed to send email")));
-            }
-        }
-        if option.eq("email") {
-            if call("aerc", "").eq(&false) {
-                return Err(InquireError::from(Error::other(
-                    "Failed to run aerc email client",
-                )));
-            }
-        }
-        if option.eq("log") {
-            if call(vcs().as_str(), "log").eq(&false) {
-                return Err(InquireError::from(Error::other(
-                    "Failed to run log command",
-                )));
-            }
-        }
-        if option.eq("add_tag") && Path::new(".git").is_dir() {
-            let mut tag = String::new();
-            let mut message = String::new();
-
-            while tag.is_empty() {
-                tag.push_str(
-                    Text::new("Specifies a tag annotated version")
-                        .prompt()?
-                        .as_str(),
-                );
-            }
-            while message.is_empty() {
-                message.push_str(
-                    Text::new("Specifies a tag annotation message")
-                        .prompt()?
-                        .as_str(),
-                );
-            }
-            if call(
-                vcs().as_str(),
-                format!("tag -a {tag} -m {message}").as_str(),
-            ) {
-                eprintln!("Failed to add tag.");
-                return Err(InquireError::from(Error::other("Failed to add tag")));
-            }
-        }
-        if option.eq("add_tag") && Path::new(".hg").is_dir() {
-            let mut tag = String::new();
-            while tag.is_empty() {
-                tag.clear();
-                tag.push_str(Text::new("specifies a tagging message").prompt()?.as_str());
-            }
-            if call(vcs().as_str(), format!("tag {tag}",).as_str()) {
-                eprintln!("Failed to add tag.");
-                return Err(InquireError::from(Error::other("Failed to add tag")));
-            }
-        }
-
-        if option.eq("clone") {
-            let mut url = String::new();
-            while url.is_empty() {
-                url.clear();
-                url.push_str(
-                    Text::new("specifies the repository clone url")
-                        .prompt()?
-                        .as_str(),
-                );
-            }
-            if call(vcs().as_str(), format!("clone {url}",).as_str()).eq(&false) {
-                return Err(InquireError::from(Error::other(
-                    "Failed to clone repository",
-                )));
-            }
-        }
-        if option.eq("quit") {
-            return Ok(0);
-        }
-        if option.eq("edit") {
-            if call("broot", ".").eq(&false) {
-                return Err(InquireError::from(Error::other("Failed to run broot")));
-            }
-        }
-        if option.eq("list_tags") {
-            if call(vcs().as_str(), "tag").eq(&false) {
-                return Err(InquireError::from(Error::other("Failed to list tags")));
-            }
-        }
-        if option.eq("status") {
-            if call(vcs().as_str(), "status").eq(&false) {
-                return Err(InquireError::from(Error::other("Failed to list status")));
-            }
-        }
-        if option.eq("diff") {
-            if diff().is_err() {
-                return Err(InquireError::from(Error::other("Failed to diff")));
-            }
-        }
-        if option.eq("commit") {}
-        if option.eq("health") {
-            if run_hooks()?.eq(&1) {
-                return Err(InquireError::from(Error::other(
-                    "Failed to run health checks",
-                )));
-            }
-        }
-        if option.eq("push") {
-            if call(vcs().as_str(), "push").eq(&false) {
-                return Err(InquireError::from(Error::other("Failed to push")));
-            }
-        }
-        if option.eq("pull") {
-            if call(vcs().as_str(), "pull").eq(&false) {
-                return Err(InquireError::from(Error::other("Failed to pull")));
-            }
-        }
-        if Confirm::new("Quit")
-            .with_default(false)
-            .prompt()
-            .expect("fail to get")
-            .eq(&true)
+        let option =
+            Select::new("wishes:".green().bold().to_string().as_str(), zen_menu()).prompt()?;
+        let response: Result<i32, Error> = match option {
+            ZenOption::Exit => Ok(QUIT),
+            ZenOption::Add => call(vcs().as_str(), "add ."),
+            ZenOption::Health => run_hooks(),
+            ZenOption::Log => call(vcs().as_str(), "log"),
+            ZenOption::Status => call(vcs().as_str(), "status"),
+            ZenOption::Diff => call(vcs().as_str(), "diff"),
+            ZenOption::Email => call("aerc", "."),
+            ZenOption::ListTags => call(vcs().as_str(), "tag"),
+        };
+        if let Ok(status) = response
+            && status.eq(&QUIT)
         {
-            return Ok(0);
+            return Ok(status);
         }
     }
 }
 fn run_hook(lang: Language, all: &mut HashMap<String, (bool, u128)>) -> Result<(), Error> {
-    let hooks = Hook::get(lang.clone());
-    all.insert(lang.to_string(), verify(hooks)?);
+    let hooks = Hook::get(lang);
+    all.insert(lang.to_string(), verify(&hooks)?);
     Ok(())
 }
 fn add_if_exists(file: &str, language: Language, vec: &mut Vec<Language>) -> Result<(), Error> {
@@ -571,25 +489,25 @@ fn add_if_exists(file: &str, language: Language, vec: &mut Vec<Language>) -> Res
         && let Ok(files) = glob(file)
     {
         for file in files {
-            if let Ok(file) = file {
-                if file.is_file() {
-                    vec.push(language);
-                }
+            if let Ok(file) = file
+                && file.is_file()
+            {
+                vec.push(language);
             }
         }
         Ok(())
-    } else {
-        if Path::new(file).is_file() {
-            vec.push(language);
-        }
+    } else if Path::new(file).is_file() {
+        vec.push(language);
         Ok(())
+    } else {
+        Err(Error::other("Failed to detect language."))
     }
 }
 #[must_use]
 pub fn detect() -> Vec<Language> {
     let mut all: Vec<Language> = Vec::new();
     for (l, file) in &LANGUAGES {
-        if let Err(_) = add_if_exists(file, *l, &mut all) {
+        if add_if_exists(file, *l, &mut all).is_err() {
             eprintln!("Failed to detect language.");
             return all;
         }

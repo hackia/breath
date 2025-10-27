@@ -98,7 +98,8 @@ impl From<String> for Language {
 }
 
 impl Language {
-    pub fn get_file(language: &Language) -> &'static str {
+    #[must_use]
+    pub const fn get_file(language: Self) -> &'static str {
         match language {
             Self::Javascript => NODE_FILE,
             Self::Typescript => TYPESCRIPT_FILE,
@@ -705,6 +706,7 @@ impl Hook {
             command: "",
         });
     }
+    #[must_use]
     pub fn get(language: Language) -> Vec<Self> {
         let mut hooks: Vec<Hook> = vec![];
         match language {

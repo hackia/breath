@@ -1,8 +1,7 @@
 pub mod commit;
 pub mod hooks;
 pub mod utils;
-
-use crate::commit::{Commit, vcs};
+use crate::commit::{Commit, run_commit, vcs};
 use crate::utils::{call, run_hooks, zen};
 use clap::Arg;
 use std::process::ExitCode;
@@ -58,13 +57,13 @@ fn main() -> ExitCode {
         }
         Some(("commit", _)) => {
             if run_hooks().is_ok() {
-                if let Ok(c) = commit.commit() {
-                    println!("Commited: {c}");
-                    ExitCode::SUCCESS
-                } else {
-                    // L'utilisateur a probablement annulé
-                    ExitCode::FAILURE
-                }
+                commit.commit().map_or(ExitCode::FAILURE, |c| {
+                    if run_commit(c).is_err() {
+                        ExitCode::FAILURE
+                    } else {
+                        ExitCode::SUCCESS
+                    }
+                })
             } else {
                 // Les hooks ont échoué
                 ExitCode::FAILURE
@@ -72,15 +71,12 @@ fn main() -> ExitCode {
         }
         // Ce bloc corrige toutes les erreurs de répétition
         Some((cmd @ ("push" | "pull" | "status" | "log" | "diff"), _)) => {
-            if call(vcs().as_str(), cmd) {
+            if call(vcs().as_str(), cmd).is_ok() {
                 ExitCode::SUCCESS
             } else {
                 ExitCode::FAILURE
             }
         }
-        // Note: Tu as supprimé la logique pour "config"
-        // Si tu veux la rajouter, il faudra un bras de match pour "config"
-        // et ré-importer configure_git / configure_hg
         _ => ExitCode::FAILURE,
     }
 }

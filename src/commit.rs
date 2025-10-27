@@ -7,6 +7,7 @@ use std::path::Path;
 use std::process::Command;
 
 #[derive(Debug)]
+#[doc = "Represent a commit type"]
 pub struct CommitType {
     pub category: &'static str,
     pub type_name: &'static str,
@@ -14,6 +15,7 @@ pub struct CommitType {
     pub description: &'static str,
 }
 
+#[doc = "all commit types supported"]
 pub const COMMIT_TYPES: [CommitType; 46] = [
     CommitType {
         category: "Core Changes",
@@ -293,6 +295,7 @@ pub const COMMIT_TYPES: [CommitType; 46] = [
     },
 ];
 
+#[doc = "detect the VCS used in the current directory"]
 #[must_use]
 pub fn vcs() -> String {
     let mercurial = Path::new(".hg").is_dir();
@@ -307,9 +310,12 @@ pub fn vcs() -> String {
     String::from(vcs)
 }
 ///
+/// Add source code
+///
 /// # Errors
 ///
 /// Return an error if the underlying VCS command fails or exits with a non-success status.
+///
 pub fn add() -> Result<(), Error> {
     if Command::new(vcs())
         .arg("add")
@@ -324,6 +330,9 @@ pub fn add() -> Result<(), Error> {
         Err(Error::other("failed to add files"))
     }
 }
+///
+/// Display the status of the working directory
+///
 /// # Errors
 ///
 /// Returns an error if the underlying VCS command fails or exits with a non-success status.
@@ -342,6 +351,9 @@ pub fn diff() -> Result<(), Error> {
     }
 }
 
+///
+/// Display the status of the working directory
+///
 /// # Errors
 ///
 /// Returns an error if the underlying VCS command fails or exits with a non-success status.
@@ -358,14 +370,15 @@ pub fn status() -> Result<(), Error> {
     Err(Error::other("failed to run status"))
 }
 
+///
 /// # Errors
 ///
 /// Returns an error if the underlying VCS `commit` command fails.
-pub fn commit(msg: &str) -> Result<i32, Error> {
+pub fn run_commit(c: &Commit) -> Result<i32, Error> {
     if Command::new(vcs())
         .arg("commit")
         .arg("-m")
-        .arg(msg)
+        .arg(c.to_string().as_str())
         .current_dir(".")
         .spawn()?
         .wait()?
@@ -377,6 +390,7 @@ pub fn commit(msg: &str) -> Result<i32, Error> {
     }
 }
 
+#[derive(Default)]
 pub struct Commit {
     pub t: String,
     pub summary: String,
@@ -388,23 +402,6 @@ pub struct Commit {
     pub requirements: String,
     pub notes: String,
     pub resolves: Vec<String>,
-}
-
-impl Default for Commit {
-    fn default() -> Self {
-        Self {
-            t: String::new(),
-            summary: String::new(),
-            why: String::new(),
-            who: String::new(),
-            when: String::new(),
-            before: String::new(),
-            after: String::new(),
-            requirements: String::new(),
-            notes: String::new(),
-            resolves: Vec::new(),
-        }
-    }
 }
 
 impl Display for Commit {
@@ -437,6 +434,13 @@ impl Commit {
         Self::default()
     }
 
+    ///
+    /// Commit the changes to the repository
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
     pub fn commit(&mut self) -> InquireResult<&mut Self> {
         self.ask_type()?
             .ask_summary()?
@@ -495,6 +499,13 @@ impl Commit {
         self.resolves.push(resolve.to_string());
         self
     }
+    ///
+    /// Ask teams notes
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
     pub fn ask_notes(&mut self) -> InquireResult<&mut Self> {
         self.notes.clear();
         self.notes
@@ -502,18 +513,38 @@ impl Commit {
         Ok(self)
     }
 
+    ///
+    /// Ask a commit type
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
     pub fn ask_type(&mut self) -> InquireResult<&mut Self> {
         self.t
             .push_str(Select::new("Commit types", types()).prompt()?.as_str());
         Ok(self)
     }
-
+    ///
+    /// The small description of the changes
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
     pub fn ask_summary(&mut self) -> InquireResult<&mut Self> {
         self.summary.clear();
         self.summary
             .push_str(Text::new("Commit summary:").prompt()?.as_str());
         Ok(self)
     }
+    ///
+    /// Why are you making these changes?
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
     pub fn ask_why(&mut self) -> InquireResult<&mut Self> {
         self.why.clear();
         self.why.push_str(
@@ -523,6 +554,14 @@ impl Commit {
         );
         Ok(self)
     }
+
+    ///
+    /// Who are you in the team
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
     pub fn ask_who(&mut self) -> InquireResult<&mut Self> {
         self.who.clear();
         self.who.push_str(
@@ -534,6 +573,13 @@ impl Commit {
         Ok(self)
     }
 
+    ///
+    /// When are you making these changes
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
     pub fn ask_when(&mut self) -> InquireResult<&mut Self> {
         self.when.push_str(
             Text::new("When are you making this change:")
@@ -543,23 +589,51 @@ impl Commit {
         Ok(self)
     }
 
+    ///
+    /// What code resolve
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
     pub fn ask_before(&mut self) -> InquireResult<&mut Self> {
         self.before
             .push_str(Editor::new("Before making this change:").prompt()?.as_str());
         Ok(self)
     }
 
+    ///
+    /// Ask for after changes
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
     pub fn ask_after(&mut self) -> InquireResult<&mut Self> {
         self.after
             .push_str(Text::new("After making this change:").prompt()?.as_str());
         Ok(self)
     }
+    ///
+    /// ask the requirements after changes
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
     pub fn ask_requirements(&mut self) -> InquireResult<&mut Self> {
         self.requirements.clear();
         self.requirements
             .push_str(Editor::new("Requirements:").prompt()?.as_str());
         Ok(self)
     }
+    ///
+    /// Issue resolved
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
     pub fn ask_resolves(&mut self) -> InquireResult<&mut Self> {
         self.resolves
             .push(Text::new("Resolves:").prompt()?.as_str().to_string());
