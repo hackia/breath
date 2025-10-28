@@ -396,7 +396,7 @@ pub struct Commit {
     pub summary: String,
     pub why: String,
     pub who: String,
-    pub roles: Vec<Role>,
+    pub roles: Vec<String>,
     pub when: String,
     pub before: String,
     pub after: String,
@@ -417,7 +417,6 @@ pub enum Role {
     Design,
     Marketing,
     Customer,
-    Other(String),
 }
 
 impl Role {
@@ -437,45 +436,42 @@ impl Role {
         ]
     }
 }
+
 impl Display for Role {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Team => write!(f, "Team"),
-            Self::Manager => write!(f, "Manager"),
-            Self::Developer => write!(f, "Developer"),
-            Self::Tester => write!(f, "Tester"),
-            Self::Packager => write!(f, "Packager"),
-            Self::Product => write!(f, "Product"),
-            Self::Engineering => write!(f, "Engineering"),
-            Self::Design => write!(f, "Design"),
-            Self::Marketing => write!(f, "Marketing"),
-            Self::Customer => write!(f, "Customer"),
-            Self::Other(s) => write!(f, "{s}"),
+            Self::Team => write!(f, "@Team"),
+            Self::Manager => write!(f, "@Manager"),
+            Self::Developer => write!(f, "@Developer"),
+            Self::Tester => write!(f, "@Tester"),
+            Self::Packager => write!(f, "@Packager"),
+            Self::Product => write!(f, "@Product"),
+            Self::Engineering => write!(f, "@Engineering"),
+            Self::Design => write!(f, "@Design"),
+            Self::Marketing => write!(f, "@Marketing"),
+            Self::Customer => write!(f, "@Customer"),
         }
     }
 }
+
 impl Display for Commit {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{} ~ {}", self.t, self.summary)?;
-        writeln!(f, "## Why changes")?;
+        writeln!(f, "\n## Why changes\n")?;
         writeln!(f, "{}", self.why)?;
-        writeln!(f, "## Who changes")?;
-        writeln!(f, "@{} ", self.who)?;
-        writeln!(f, "## Roles")?;
-        for role in &self.roles {
-            writeln!(f, "@{role}")?;
-        }
-        writeln!(f, "## When changes")?;
+        writeln!(f, "\n## Who changes\n")?;
+        writeln!(f, "@{} ~ {} ", self.who, self.roles.join(" ").as_str())?;
+        writeln!(f, "\n## When changes\n")?;
         writeln!(f, "{}", self.when)?;
-        writeln!(f, "## Before changes")?;
+        writeln!(f, "\n## Before changes\n")?;
         writeln!(f, "{}", self.before)?;
-        writeln!(f, "## After changes")?;
+        writeln!(f, "\n## After changes\n")?;
         writeln!(f, "{}", self.after)?;
-        writeln!(f, "## Requirements")?;
+        writeln!(f, "\n## Requirements\n")?;
         writeln!(f, "{}", self.requirements)?;
-        writeln!(f, "## Teams notes")?;
+        writeln!(f, "\n## Teams notes\n")?;
         writeln!(f, "{}", self.notes)?;
-        writeln!(f, "## Resolves")?;
+        writeln!(f, "\n## Resolves\n")?;
         for resolve in &self.resolves {
             writeln!(f, "Fixes #{resolve}")?;
         }
@@ -548,9 +544,15 @@ impl Commit {
     /// On bad user inputs
     ///
     pub fn ask_type(&mut self) -> InquireResult<&mut Self> {
-        self.t
-            .push_str(Select::new("Commit types", types()).prompt()?.as_str());
-        Ok(self)
+        self.t.clear();
+
+        let x = Select::new("Commit types", types()).prompt()?;
+        let all = x.split('~').collect::<Vec<&str>>();
+        if let Some(t) = all.first() {
+            self.t.push_str(t);
+            return Ok(self);
+        }
+        Err(InquireError::from(Error::other("bad commit type")))
     }
 
     ///
@@ -562,9 +564,13 @@ impl Commit {
     ///
     pub fn ask_roles(&mut self) -> InquireResult<&mut Self> {
         self.roles.clear();
-        let mut roles = Role::all();
-        roles.sort();
-        self.roles = MultiSelect::new("Select roles", roles).prompt()?;
+        let mut x = Vec::new();
+        let mut r = Role::all();
+        r.sort();
+        for role in &r {
+            x.push(role.to_string());
+        }
+        self.roles = MultiSelect::new("Select roles", x).prompt()?;
         Ok(self)
     }
     ///
@@ -657,7 +663,7 @@ impl Commit {
         Ok(self)
     }
     ///
-    /// ask the requirements after changes
+    /// Ask for after changes
     ///
     /// # Errors
     ///
@@ -679,7 +685,10 @@ impl Commit {
     pub fn ask_resolves(&mut self) -> InquireResult<&mut Self> {
         self.resolves
             .push(Text::new("Resolves:").prompt()?.as_str().to_string());
-        while Confirm::new("Add another resolve?").prompt()? {
+        while Confirm::new("Add another resolve?")
+            .with_default(false)
+            .prompt()?
+        {
             self.resolves
                 .push(Text::new("Resolves:").prompt()?.as_str().to_string());
         }
