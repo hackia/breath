@@ -459,28 +459,53 @@ impl Display for Commit {
         writeln!(f, "\n\tWhy changes?\n")?;
         let why_lines = self.why.split('\n').collect::<Vec<&str>>();
         for line in why_lines {
+            if line.is_empty() {
+                writeln!(f, "\n")?;
+                continue;
+            }
             writeln!(f, "\t\t* {line}")?;
         }
         writeln!(f, "\n\tBreaking Changes:\n")?;
         let breaking_changes_lines = self.breaking_changes.split('\n').collect::<Vec<&str>>();
         for line in breaking_changes_lines {
+            if line.is_empty() {
+                writeln!(f, "\n")?;
+                continue;
+            }
             writeln!(f, "\t\t* {line}")?;
         }
         writeln!(f, "\n\tWhat changes?\n")?;
         let what_lines = self.what.split('\n').collect::<Vec<&str>>();
         for line in what_lines {
+            if line.is_empty() {
+                writeln!(f, "\n")?;
+                continue;
+            }
             writeln!(f, "\t\t* {line}")?;
         }
         writeln!(f, "\n\tWho changes?\n")?;
-        writeln!(f, "\t\t{} ~ {} ", self.who, self.roles.join(" ").as_str())?;
+        writeln!(
+            f,
+            "\t\t* @{} ~ {} ",
+            self.who,
+            self.roles.join(" ").as_str()
+        )?;
         writeln!(f, "\n\tBenefits:\n")?;
         let benefits_lines = self.benefits.split('\n').collect::<Vec<&str>>();
         for line in benefits_lines {
+            if line.is_empty() {
+                writeln!(f, "\n")?;
+                continue;
+            }
             writeln!(f, "\t\t* {line}")?;
         }
         writeln!(f, "\n\tNotes:\n")?;
         let notes_lines = self.notes.split('\n').collect::<Vec<&str>>();
         for line in notes_lines {
+            if line.is_empty() {
+                writeln!(f, "\n")?;
+                continue;
+            }
             writeln!(f, "\t\t* {line}")?;
         }
         writeln!(f, "\n\tResolves\n")?;
