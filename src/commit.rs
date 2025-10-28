@@ -397,10 +397,9 @@ pub struct Commit {
     pub why: String,
     pub who: String,
     pub roles: Vec<String>,
-    pub when: String,
-    pub before: String,
-    pub after: String,
-    pub requirements: String,
+    pub what: String,
+    pub benefits: String,
+    pub breaking_changes: String,
     pub notes: String,
     pub resolves: Vec<String>,
 }
@@ -440,16 +439,16 @@ impl Role {
 impl Display for Role {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Team => write!(f, "@Team"),
-            Self::Manager => write!(f, "@Manager"),
-            Self::Developer => write!(f, "@Developer"),
-            Self::Tester => write!(f, "@Tester"),
-            Self::Packager => write!(f, "@Packager"),
-            Self::Product => write!(f, "@Product"),
+            Self::Team => write!(f, "Team"),
+            Self::Manager => write!(f, "Manager"),
+            Self::Developer => write!(f, "Developer"),
+            Self::Tester => write!(f, "Tester"),
+            Self::Packager => write!(f, "Packager"),
+            Self::Product => write!(f, "Product"),
             Self::Engineering => write!(f, "@Engineering"),
-            Self::Design => write!(f, "@Design"),
-            Self::Marketing => write!(f, "@Marketing"),
-            Self::Customer => write!(f, "@Customer"),
+            Self::Design => write!(f, "Design"),
+            Self::Marketing => write!(f, "Marketing"),
+            Self::Customer => write!(f, "Customer"),
         }
     }
 }
@@ -457,19 +456,17 @@ impl Display for Role {
 impl Display for Commit {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{} ~ {}", self.t, self.summary)?;
-        writeln!(f, "\n## Why changes\n")?;
+        writeln!(f, "\n## Why changes?\n")?;
         writeln!(f, "{}", self.why)?;
-        writeln!(f, "\n## Who changes\n")?;
-        writeln!(f, "@{} ~ {} ", self.who, self.roles.join(" ").as_str())?;
-        writeln!(f, "\n## When changes\n")?;
-        writeln!(f, "{}", self.when)?;
-        writeln!(f, "\n## Before changes\n")?;
-        writeln!(f, "{}", self.before)?;
-        writeln!(f, "\n## After changes\n")?;
-        writeln!(f, "{}", self.after)?;
-        writeln!(f, "\n## Requirements\n")?;
-        writeln!(f, "{}", self.requirements)?;
-        writeln!(f, "\n## Teams notes\n")?;
+        writeln!(f, "\n## Breaking Changes:\n")?;
+        writeln!(f, "{}", self.breaking_changes)?;
+        writeln!(f, "\n## What changes?\n")?;
+        writeln!(f, "{}", self.what)?;
+        writeln!(f, "\n## Who changes?\n")?;
+        writeln!(f, "{} ~ {} ", self.who, self.roles.join(" ").as_str())?;
+        writeln!(f, "\n## Benefits:\n")?;
+        writeln!(f, "{}", self.benefits)?;
+        writeln!(f, "\n## Notes:\n")?;
         writeln!(f, "{}", self.notes)?;
         writeln!(f, "\n## Resolves\n")?;
         for resolve in &self.resolves {
@@ -512,11 +509,10 @@ impl Commit {
             .ask_summary()?
             .ask_roles()?
             .ask_why()?
-            .ask_when()?
+            .breaking_changes()?
+            .ask_what()?
             .ask_who()?
-            .ask_before()?
-            .ask_after()?
-            .ask_requirements()?
+            .ask_benefits()?
             .ask_notes()?
             .ask_resolves()?
             .confirm()
@@ -628,12 +624,10 @@ impl Commit {
     ///
     /// On bad user inputs
     ///
-    pub fn ask_when(&mut self) -> InquireResult<&mut Self> {
-        self.when.push_str(
-            Editor::new("When are you making this change:")
-                .prompt()?
-                .as_str(),
-        );
+    pub fn ask_what(&mut self) -> InquireResult<&mut Self> {
+        self.what.clear();
+        self.what
+            .push_str(Editor::new("What changes?").prompt()?.as_str());
         Ok(self)
     }
 
@@ -644,9 +638,13 @@ impl Commit {
     ///
     /// On bad user inputs
     ///
-    pub fn ask_before(&mut self) -> InquireResult<&mut Self> {
-        self.before
-            .push_str(Editor::new("Before making this change:").prompt()?.as_str());
+    pub fn ask_benefits(&mut self) -> InquireResult<&mut Self> {
+        self.benefits.clear();
+        self.benefits.push_str(
+            Editor::new("What benefits does this change provide?")
+                .prompt()?
+                .as_str(),
+        );
         Ok(self)
     }
 
@@ -657,22 +655,10 @@ impl Commit {
     ///
     /// On bad user inputs
     ///
-    pub fn ask_after(&mut self) -> InquireResult<&mut Self> {
-        self.after
-            .push_str(Editor::new("After making this change:").prompt()?.as_str());
-        Ok(self)
-    }
-    ///
-    /// Ask for after changes
-    ///
-    /// # Errors
-    ///
-    /// On bad user inputs
-    ///
-    pub fn ask_requirements(&mut self) -> InquireResult<&mut Self> {
-        self.requirements.clear();
-        self.requirements
-            .push_str(Editor::new("Requirements:").prompt()?.as_str());
+    pub fn breaking_changes(&mut self) -> InquireResult<&mut Self> {
+        self.breaking_changes.clear();
+        self.breaking_changes
+            .push_str(Editor::new("Breaking changes?").prompt()?.as_str());
         Ok(self)
     }
     ///
@@ -692,6 +678,14 @@ impl Commit {
             self.resolves
                 .push(Text::new("Resolves:").prompt()?.as_str().to_string());
         }
-        Ok(self)
+        if Confirm::new(format!("commit resolves {}", self.resolves.join(" ")).as_str())
+            .with_default(true)
+            .prompt()?
+        {
+            Ok(self)
+        } else {
+            self.resolves.clear();
+            self.ask_resolves()
+        }
     }
 }
