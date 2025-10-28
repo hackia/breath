@@ -1,7 +1,7 @@
 use crate::utils::types;
 use inquire::error::InquireResult;
-use inquire::{Confirm, Editor, Select, Text};
-use std::fmt::Display;
+use inquire::{Confirm, Editor, MultiSelect, Select, Text};
+use std::fmt::{Display, Formatter};
 use std::io::Error;
 use std::path::Path;
 use std::process::Command;
@@ -390,12 +390,13 @@ pub fn run_commit(c: &Commit) -> Result<i32, Error> {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub struct Commit {
     pub t: String,
     pub summary: String,
     pub why: String,
     pub who: String,
+    pub roles: Vec<Role>,
     pub when: String,
     pub before: String,
     pub after: String,
@@ -404,13 +405,66 @@ pub struct Commit {
     pub resolves: Vec<String>,
 }
 
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Clone)]
+pub enum Role {
+    Team,
+    Manager,
+    Developer,
+    Tester,
+    Packager,
+    Product,
+    Engineering,
+    Design,
+    Marketing,
+    Customer,
+    Other(String),
+}
+
+impl Role {
+    #[must_use]
+    pub fn all() -> Vec<Self> {
+        vec![
+            Self::Team,
+            Self::Manager,
+            Self::Developer,
+            Self::Tester,
+            Self::Packager,
+            Self::Product,
+            Self::Engineering,
+            Self::Design,
+            Self::Marketing,
+            Self::Customer,
+        ]
+    }
+}
+impl Display for Role {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Team => write!(f, "Team"),
+            Self::Manager => write!(f, "Manager"),
+            Self::Developer => write!(f, "Developer"),
+            Self::Tester => write!(f, "Tester"),
+            Self::Packager => write!(f, "Packager"),
+            Self::Product => write!(f, "Product"),
+            Self::Engineering => write!(f, "Engineering"),
+            Self::Design => write!(f, "Design"),
+            Self::Marketing => write!(f, "Marketing"),
+            Self::Customer => write!(f, "Customer"),
+            Self::Other(s) => write!(f, "{s}"),
+        }
+    }
+}
 impl Display for Commit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{} ~ {}", self.t, self.summary)?;
         writeln!(f, "## Why changes")?;
         writeln!(f, "{}", self.why)?;
         writeln!(f, "## Who changes")?;
-        writeln!(f, "{}", self.who)?;
+        writeln!(f, "@{} ", self.who)?;
+        writeln!(f, "## Roles")?;
+        for role in &self.roles {
+            writeln!(f, "@{role}")?;
+        }
         writeln!(f, "## When changes")?;
         writeln!(f, "{}", self.when)?;
         writeln!(f, "## Before changes")?;
@@ -444,6 +498,7 @@ impl Commit {
     pub fn commit(&mut self) -> InquireResult<&mut Self> {
         self.ask_type()?
             .ask_summary()?
+            .ask_roles()?
             .ask_why()?
             .ask_when()?
             .ask_who()?
@@ -453,52 +508,7 @@ impl Commit {
             .ask_notes()?
             .ask_resolves()
     }
-    pub fn set_type(&mut self, t: &str) -> &mut Self {
-        self.t.clear();
-        self.t.push_str(t);
-        self
-    }
-    pub fn set_summary(&mut self, summary: &str) -> &mut Self {
-        self.summary.clear();
-        self.summary.push_str(summary);
-        self
-    }
-    pub fn set_why(&mut self, why: &str) -> &mut Self {
-        self.why.clear();
-        self.why.push_str(why);
-        self
-    }
 
-    pub fn set_when(&mut self, when: &str) -> &mut Self {
-        self.when.clear();
-        self.when.push_str(when);
-        self
-    }
-    pub fn set_who(&mut self, who: &str) -> &mut Self {
-        self.who.clear();
-        self.who.push_str(who);
-        self
-    }
-    pub fn set_before(&mut self, before: &str) -> &mut Self {
-        self.before.clear();
-        self.before.push_str(before);
-        self
-    }
-    pub fn set_after(&mut self, after: &str) -> &mut Self {
-        self.after.clear();
-        self.after.push_str(after);
-        self
-    }
-    pub fn set_requirements(&mut self, requirements: &str) -> &mut Self {
-        self.requirements.clear();
-        self.requirements.push_str(requirements);
-        self
-    }
-    pub fn add_resolve(&mut self, resolve: &str) -> &mut Self {
-        self.resolves.clear();
-        self.resolves.push(resolve.to_string());
-        self
-    }
     ///
     /// Ask teams notes
     ///
@@ -523,6 +533,21 @@ impl Commit {
     pub fn ask_type(&mut self) -> InquireResult<&mut Self> {
         self.t
             .push_str(Select::new("Commit types", types()).prompt()?.as_str());
+        Ok(self)
+    }
+
+    ///
+    /// Ask the author role
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
+    pub fn ask_roles(&mut self) -> InquireResult<&mut Self> {
+        self.roles.clear();
+        let mut roles = Role::all();
+        roles.sort();
+        self.roles = MultiSelect::new("Select roles", roles).prompt()?;
         Ok(self)
     }
     ///
@@ -556,7 +581,7 @@ impl Commit {
     }
 
     ///
-    /// Who are you in the team
+    /// Who are you in the team?
     ///
     /// # Errors
     ///
@@ -574,7 +599,7 @@ impl Commit {
     }
 
     ///
-    /// When are you making these changes
+    /// When are you making these changes?
     ///
     /// # Errors
     ///

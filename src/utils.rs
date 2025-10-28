@@ -1,7 +1,8 @@
 use crate::commit::{COMMIT_TYPES, vcs};
-use crate::hooks::Language::CSharp;
+use crate::hooks::Language::{CSharp, D};
 use crate::hooks::{Hook, LANGUAGES, Language};
 use crossterm::style::Stylize;
+use git2::{BranchType, Repository};
 use glob::glob;
 use inquire::validator::{StringValidator, Validation};
 use inquire::{CustomUserError, InquireError, Select};
@@ -118,7 +119,6 @@ pub fn call(program: &str, arg: &str) -> Result<i32, Error> {
         .wait()?
         .success()
     {
-        eprintln!("{program} not founded");
         return Err(Error::other(format!("{program} not founded")));
     }
     Ok(OK)
@@ -230,7 +230,7 @@ pub fn types() -> Vec<String> {
 /// - `cargo` commands for project verification.
 /// - Logs are written to the `breathes ` directory for each respective check
 ///
-pub fn verify(hooks: &[Hook]) -> Result<(bool, u128), Error> {
+pub fn verify(hooks: &[Hook]) -> Result<(bool, u64), Error> {
     let start = Instant::now();
     let mut status: Vec<bool> = Vec::new();
     create_dir_all("breathes")?;
@@ -268,7 +268,7 @@ pub fn verify(hooks: &[Hook]) -> Result<(bool, u128), Error> {
     }
     Ok((
         status.contains(&false).eq(&false),
-        start.elapsed().as_millis(),
+        start.elapsed().as_secs(),
     ))
 }
 
@@ -341,7 +341,7 @@ pub fn verify(hooks: &[Hook]) -> Result<(bool, u128), Error> {
 ///   the function is executed in the appropriate working directory.
 pub fn run_hooks() -> Result<i32, Error> {
     let start = Instant::now();
-    let mut all: HashMap<String, (bool, u128)> = HashMap::new();
+    let mut all: HashMap<String, (bool, u64)> = HashMap::new();
     let mut table = tabled::builder::Builder::default();
     let mut response: Vec<bool> = Vec::new();
     let l = detect();
@@ -364,13 +364,13 @@ pub fn run_hooks() -> Result<i32, Error> {
             table.push_record([
                 language.to_string(),
                 "Success".to_string(),
-                format!("{}ms", status.1),
+                format!("{}s", status.1),
             ]);
         } else {
             table.push_record([
                 language.to_string(),
                 "Failure".to_string(),
-                format!("{}ms", status.1),
+                format!("{}s", status.1),
             ]);
         }
     }
@@ -378,13 +378,13 @@ pub fn run_hooks() -> Result<i32, Error> {
         table.push_record([
             "All".to_string(),
             String::from("Failure"),
-            format!("{}ms", start.elapsed().as_millis()),
+            format!("{}s", start.elapsed().as_secs()),
         ]);
     } else {
         table.push_record([
             "All".to_string(),
             String::from("Success"),
-            format!("{}ms", start.elapsed().as_millis()),
+            format!("{}s", start.elapsed().as_secs()),
         ]);
     }
     let mut report = table.build();
@@ -401,12 +401,13 @@ pub fn zen_menu() -> Vec<ZenOption> {
         ZenOption::Exit,
         ZenOption::Add,
         ZenOption::Health,
+        ZenOption::Edit,
         ZenOption::Log,
         ZenOption::Diff,
         ZenOption::Email,
         ZenOption::ListTags,
     ];
-    x.sort_unstable();
+    x.sort();
     x
 }
 
@@ -421,6 +422,7 @@ impl Display for ZenOption {
             Self::Email => write!(f, "Email"),
             Self::ListTags => write!(f, "List Tags"),
             Self::Status => write!(f, "Status"),
+            Self::Edit => write!(f, "Editor"),
         }
     }
 }
@@ -429,6 +431,7 @@ impl Display for ZenOption {
 pub enum ZenOption {
     Exit,
     Add,
+    Edit,
     Health,
     Log,
     Diff,
@@ -445,10 +448,85 @@ impl From<&str> for ZenOption {
             "Diff" => Self::Diff,
             "Email" => Self::Email,
             "ListTags" => Self::ListTags,
+            "Status" => Self::Status,
+            "Editor" => Self::Edit,
             "Quit" => Self::Exit,
             _ => Self::Health,
         }
     }
+}
+
+pub struct GitZen {
+    repo: Result<Repository, git2::Error>,
+    local_branches: Vec<String>,
+    remote_branches: Vec<String>,
+    remotes: Vec<String>,
+    current_branch: Option<String>,
+}
+impl Default for GitZen {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+impl GitZen {
+    /// Ouvre le dépôt dans le dossier courant "." et charge ses informations.
+    #[must_use] // Important pour que le compilateur te prévienne si tu ne l'utilises pas
+    pub fn new() -> Self {
+        let repo_result = Repository::open(".");
+
+        // Ces variables seront remplies si le dépôt est valide
+        let (mut local_branches, mut remote_branches, mut remotes, mut current_branch) =
+            (Vec::new(), Vec::new(), Vec::new(), None);
+
+        // On vérifie si l'ouverture du dépôt a réussi
+        if let Ok(repo) = &repo_result {
+            // Si oui, on remplit les informations
+
+            // 1. Branche actuelle (HEAD)
+            current_branch = repo
+                .head()
+                .ok() // Convertit Result<Reference> en Option<Reference>
+                .and_then(|head_ref| head_ref.shorthand().map(String::from)); // Récupère le nom court (ex: "main")
+
+            // 2. Remotes (ex: "origin")
+            if let Ok(remotes_array) = repo.remotes() {
+                remotes = remotes_array
+                    .iter()
+                    .filter_map(|r| r.map(String::from)) // Convertit &str en String
+                    .collect();
+            }
+
+            // 3. Branches locales
+            if let Ok(local_branch_iter) = repo.branches(Some(BranchType::Local)) {
+                local_branch_iter.for_each(|b| {
+                    if let Ok((branch, _t)) = b
+                        && let Ok(b) = branch.name()
+                    {
+                        local_branches.push(b.map_or_else(|| String::from("HEAD"), String::from));
+                    }
+                });
+            }
+
+            // 4. Branches distantes
+            if let Ok(remote_branch_iter) = repo.branches(Some(BranchType::Remote)) {
+                remote_branch_iter.for_each(|b| {
+                    if let Ok((branch, _t)) = b
+                        && let Ok(b) = branch.name()
+                    {
+                        remote_branches.push(b.map_or_else(|| String::from("HEAD"), String::from));
+                    }
+                });
+            }
+        }
+        Self {
+            repo: repo_result,
+            local_branches,
+            remote_branches,
+            remotes,
+            current_branch,
+        }
+    }
+    pub fn status(&self) {}
 }
 
 ///
@@ -461,7 +539,7 @@ impl From<&str> for ZenOption {
 pub fn zen() -> Result<i32, InquireError> {
     loop {
         let option =
-            Select::new("wishes:".green().bold().to_string().as_str(), zen_menu()).prompt()?;
+            Select::new("@wishes".green().bold().to_string().as_str(), zen_menu()).prompt()?;
         let response: Result<i32, Error> = match option {
             ZenOption::Exit => Ok(QUIT),
             ZenOption::Add => call(vcs().as_str(), "add ."),
@@ -471,6 +549,7 @@ pub fn zen() -> Result<i32, InquireError> {
             ZenOption::Diff => call(vcs().as_str(), "diff"),
             ZenOption::Email => call("aerc", "."),
             ZenOption::ListTags => call(vcs().as_str(), "tag"),
+            ZenOption::Edit => call("boot", "."),
         };
         if let Ok(status) = response
             && status.eq(&QUIT)
@@ -479,13 +558,24 @@ pub fn zen() -> Result<i32, InquireError> {
         }
     }
 }
-fn run_hook(lang: Language, all: &mut HashMap<String, (bool, u128)>) -> Result<(), Error> {
+fn run_hook(lang: Language, all: &mut HashMap<String, (bool, u64)>) -> Result<(), Error> {
     let hooks = Hook::get(lang);
     all.insert(lang.to_string(), verify(&hooks)?);
     Ok(())
 }
 fn add_if_exists(file: &str, language: Language, vec: &mut Vec<Language>) -> Result<(), Error> {
     if language == CSharp
+        && let Ok(files) = glob(file)
+    {
+        for file in files {
+            if let Ok(file) = file
+                && file.is_file()
+            {
+                vec.push(language);
+            }
+        }
+        Ok(())
+    } else if language == D
         && let Ok(files) = glob(file)
     {
         for file in files {

@@ -248,6 +248,22 @@ impl Hook {
     pub fn typescript(hooks: &mut Vec<Self>) {
         hooks.push(Self {
             language: Language::Typescript,
+            description: "Testing your project",
+            success: "Tests passed",
+            failure: "Tests failed",
+            file: "test.log",
+            command: "npm run test",
+        });
+        hooks.push(Self {
+            language: Language::Typescript,
+            description: "Auditing your project",
+            success: "No vulnerabilities found",
+            failure: "Vulnerabilities found",
+            file: "audit.log",
+            command: "npm audit",
+        });
+        hooks.push(Self {
+            language: Language::Typescript,
             description: "Checking for outdated packages in your project",
             success: "No outdated packages found",
             failure: "Outdated packages found",
@@ -708,7 +724,7 @@ impl Hook {
     }
     #[must_use]
     pub fn get(language: Language) -> Vec<Self> {
-        let mut hooks: Vec<Hook> = vec![];
+        let mut hooks: Vec<Self> = vec![];
         match language {
             Language::Unknown => {}
             Language::Typescript => Self::typescript(&mut hooks),
