@@ -456,21 +456,36 @@ impl Display for Role {
 impl Display for Commit {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{} ~ {}", self.t, self.summary)?;
-        writeln!(f, "\n## Why changes?\n")?;
-        writeln!(f, "{}", self.why)?;
-        writeln!(f, "\n## Breaking Changes:\n")?;
-        writeln!(f, "{}", self.breaking_changes)?;
-        writeln!(f, "\n## What changes?\n")?;
-        writeln!(f, "{}", self.what)?;
-        writeln!(f, "\n## Who changes?\n")?;
-        writeln!(f, "{} ~ {} ", self.who, self.roles.join(" ").as_str())?;
-        writeln!(f, "\n## Benefits:\n")?;
-        writeln!(f, "{}", self.benefits)?;
-        writeln!(f, "\n## Notes:\n")?;
-        writeln!(f, "{}", self.notes)?;
-        writeln!(f, "\n## Resolves\n")?;
+        writeln!(f, "\n\tWhy changes?\n")?;
+        let why_lines = self.why.split('\n').collect::<Vec<&str>>();
+        for line in why_lines {
+            writeln!(f, "\t\t* {line}")?;
+        }
+        writeln!(f, "\n\tBreaking Changes:\n")?;
+        let breaking_changes_lines = self.breaking_changes.split('\n').collect::<Vec<&str>>();
+        for line in breaking_changes_lines {
+            writeln!(f, "\t\t* {line}")?;
+        }
+        writeln!(f, "\n\tWhat changes?\n")?;
+        let what_lines = self.what.split('\n').collect::<Vec<&str>>();
+        for line in what_lines {
+            writeln!(f, "\t\t* {line}")?;
+        }
+        writeln!(f, "\n\tWho changes?\n")?;
+        writeln!(f, "\t\t{} ~ {} ", self.who, self.roles.join(" ").as_str())?;
+        writeln!(f, "\n\tBenefits:\n")?;
+        let benefits_lines = self.benefits.split('\n').collect::<Vec<&str>>();
+        for line in benefits_lines {
+            writeln!(f, "\t\t* {line}")?;
+        }
+        writeln!(f, "\n\tNotes:\n")?;
+        let notes_lines = self.notes.split('\n').collect::<Vec<&str>>();
+        for line in notes_lines {
+            writeln!(f, "\t\t* {line}")?;
+        }
+        writeln!(f, "\n\tResolves\n")?;
         for resolve in &self.resolves {
-            writeln!(f, "Fixes #{resolve}")?;
+            writeln!(f, "\t\tFixes #{resolve}")?;
         }
         Ok(())
     }
