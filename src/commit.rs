@@ -1,6 +1,6 @@
 use crate::utils::types;
 use inquire::error::InquireResult;
-use inquire::{Confirm, Editor, MultiSelect, Select, Text};
+use inquire::{Confirm, Editor, InquireError, MultiSelect, Select, Text};
 use std::fmt::{Display, Formatter};
 use std::io::Error;
 use std::path::Path;
@@ -374,7 +374,7 @@ pub fn status() -> Result<(), Error> {
 /// # Errors
 ///
 /// Returns an error if the underlying VCS `commit` command fails.
-pub fn run_commit(c: &Commit) -> Result<i32, Error> {
+pub fn run_commit(c: &mut Commit) -> Result<i32, Error> {
     if Command::new(vcs())
         .arg("commit")
         .arg("-m")
@@ -487,7 +487,23 @@ impl Commit {
     pub fn new() -> Self {
         Self::default()
     }
-
+    ///
+    ///
+    /// # Errors
+    ///
+    /// Bad user or cancel by user
+    ///
+    pub fn confirm(&mut self) -> InquireResult<&mut Self> {
+        println!("{self}");
+        if Confirm::new("Confirm commit?")
+            .with_default(true)
+            .prompt()?
+        {
+            Ok(self)
+        } else {
+            Err(InquireError::from(Error::other("commit aborted")))
+        }
+    }
     ///
     /// Commit the changes to the repository
     ///
@@ -506,7 +522,8 @@ impl Commit {
             .ask_after()?
             .ask_requirements()?
             .ask_notes()?
-            .ask_resolves()
+            .ask_resolves()?
+            .confirm()
     }
 
     ///
@@ -607,7 +624,7 @@ impl Commit {
     ///
     pub fn ask_when(&mut self) -> InquireResult<&mut Self> {
         self.when.push_str(
-            Text::new("When are you making this change:")
+            Editor::new("When are you making this change:")
                 .prompt()?
                 .as_str(),
         );
@@ -636,7 +653,7 @@ impl Commit {
     ///
     pub fn ask_after(&mut self) -> InquireResult<&mut Self> {
         self.after
-            .push_str(Text::new("After making this change:").prompt()?.as_str());
+            .push_str(Editor::new("After making this change:").prompt()?.as_str());
         Ok(self)
     }
     ///

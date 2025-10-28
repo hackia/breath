@@ -1,20 +1,21 @@
-use crate::commit::{COMMIT_TYPES, vcs};
+use crate::commit::{COMMIT_TYPES, Commit, run_commit, vcs};
 use crate::hooks::Language::{CSharp, D};
 use crate::hooks::{Hook, LANGUAGES, Language};
+use crossterm::cursor::MoveTo;
+use crossterm::execute;
 use crossterm::style::Stylize;
-use git2::{BranchType, Repository};
+use crossterm::terminal::{Clear, ClearType};
 use glob::glob;
 use inquire::validator::{StringValidator, Validation};
-use inquire::{CustomUserError, InquireError, Select};
-use lazy_static::lazy_static;
+use inquire::{Confirm, CustomUserError, InquireError, Select};
 use regex::Regex;
 use spinners::{Spinner, Spinners};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::fs::{File, create_dir_all};
-use std::io::Error;
+use std::io::{Error, stdout};
 use std::path::{MAIN_SEPARATOR_STR, Path};
-use std::process::Command;
+use std::process::{Command, exit};
 use std::time::Instant;
 use tabled::settings::Style;
 
@@ -22,17 +23,12 @@ pub const OK: i32 = 7;
 pub const KO: i32 = 8;
 pub const QUIT: i32 = 0;
 
-lazy_static! {
-    static ref EMAIL_REGEX: Regex =
-        Regex::new(r"^[a-zA-Z0-9._+-]+@([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$").unwrap();
-}
-
 #[derive(Clone)]
 pub struct EmailValidator;
 
 impl StringValidator for EmailValidator {
     fn validate(&self, input: &str) -> Result<Validation, CustomUserError> {
-        if EMAIL_REGEX.is_match(input) {
+        if Regex::new(r"^[a-zA-Z0-9._+-]+@([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$")?.is_match(input) {
             Ok(Validation::Valid)
         } else {
             Ok(Validation::Invalid("No a valid email".into()))
@@ -112,8 +108,14 @@ pub fn ok(message: &str, cmd: &mut Command, success: &str, failure: &str) -> Res
 /// On failure to execute the command
 ///
 pub fn call(program: &str, arg: &str) -> Result<i32, Error> {
-    if !Command::new(program)
-        .args(arg.split_whitespace())
+    let to = if arg.is_empty() {
+        program.to_string()
+    } else {
+        format!("{program} {arg}")
+    };
+    if !Command::new("sh")
+        .arg("-c")
+        .arg(to.as_str())
         .current_dir(".")
         .spawn()?
         .wait()?
@@ -348,10 +350,6 @@ pub fn run_hooks() -> Result<i32, Error> {
     if l.is_empty() {
         return Err(Error::other("No language detected"));
     }
-    table.push_record(["Detected"]);
-    for language in &l {
-        table.push_record([language.to_string()]);
-    }
     for lang in &l {
         if run_hook(*lang, &mut all).is_err() {
             return Err(Error::other("Failed to run hook"));
@@ -395,26 +393,10 @@ pub fn run_hooks() -> Result<i32, Error> {
     Ok(0)
 }
 
-#[must_use]
-pub fn zen_menu() -> Vec<ZenOption> {
-    let mut x = vec![
-        ZenOption::Exit,
-        ZenOption::Add,
-        ZenOption::Health,
-        ZenOption::Edit,
-        ZenOption::Log,
-        ZenOption::Diff,
-        ZenOption::Email,
-        ZenOption::ListTags,
-    ];
-    x.sort();
-    x
-}
-
 impl Display for ZenOption {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Exit => write!(f, "Exit"),
+            Self::Quit => write!(f, "Quit"),
             Self::Add => write!(f, "Add"),
             Self::Health => write!(f, "Health"),
             Self::Log => write!(f, "Log"),
@@ -423,21 +405,42 @@ impl Display for ZenOption {
             Self::ListTags => write!(f, "List Tags"),
             Self::Status => write!(f, "Status"),
             Self::Edit => write!(f, "Editor"),
+            Self::Commit => write!(f, "Commit"),
         }
     }
 }
 
-#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Clone)]
+#[derive(Ord, PartialOrd, Eq, PartialEq, Debug, Clone, Hash, Copy)]
 pub enum ZenOption {
-    Exit,
+    Quit,
     Add,
     Edit,
+    Commit,
     Health,
     Log,
     Diff,
     Email,
     Status,
     ListTags,
+}
+impl ZenOption {
+    #[must_use]
+    pub fn all() -> Vec<Self> {
+        let mut x = vec![
+            Self::Quit,
+            Self::Add,
+            Self::Edit,
+            Self::Commit,
+            Self::Health,
+            Self::Log,
+            Self::Diff,
+            Self::Email,
+            Self::Status,
+            Self::ListTags,
+        ];
+        x.sort();
+        x
+    }
 }
 impl From<&str> for ZenOption {
     fn from(value: &str) -> Self {
@@ -450,83 +453,10 @@ impl From<&str> for ZenOption {
             "ListTags" => Self::ListTags,
             "Status" => Self::Status,
             "Editor" => Self::Edit,
-            "Quit" => Self::Exit,
-            _ => Self::Health,
+            "Commit" => Self::Commit,
+            _ => Self::Quit,
         }
     }
-}
-
-pub struct GitZen {
-    repo: Result<Repository, git2::Error>,
-    local_branches: Vec<String>,
-    remote_branches: Vec<String>,
-    remotes: Vec<String>,
-    current_branch: Option<String>,
-}
-impl Default for GitZen {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-impl GitZen {
-    /// Ouvre le dépôt dans le dossier courant "." et charge ses informations.
-    #[must_use] // Important pour que le compilateur te prévienne si tu ne l'utilises pas
-    pub fn new() -> Self {
-        let repo_result = Repository::open(".");
-
-        // Ces variables seront remplies si le dépôt est valide
-        let (mut local_branches, mut remote_branches, mut remotes, mut current_branch) =
-            (Vec::new(), Vec::new(), Vec::new(), None);
-
-        // On vérifie si l'ouverture du dépôt a réussi
-        if let Ok(repo) = &repo_result {
-            // Si oui, on remplit les informations
-
-            // 1. Branche actuelle (HEAD)
-            current_branch = repo
-                .head()
-                .ok() // Convertit Result<Reference> en Option<Reference>
-                .and_then(|head_ref| head_ref.shorthand().map(String::from)); // Récupère le nom court (ex: "main")
-
-            // 2. Remotes (ex: "origin")
-            if let Ok(remotes_array) = repo.remotes() {
-                remotes = remotes_array
-                    .iter()
-                    .filter_map(|r| r.map(String::from)) // Convertit &str en String
-                    .collect();
-            }
-
-            // 3. Branches locales
-            if let Ok(local_branch_iter) = repo.branches(Some(BranchType::Local)) {
-                local_branch_iter.for_each(|b| {
-                    if let Ok((branch, _t)) = b
-                        && let Ok(b) = branch.name()
-                    {
-                        local_branches.push(b.map_or_else(|| String::from("HEAD"), String::from));
-                    }
-                });
-            }
-
-            // 4. Branches distantes
-            if let Ok(remote_branch_iter) = repo.branches(Some(BranchType::Remote)) {
-                remote_branch_iter.for_each(|b| {
-                    if let Ok((branch, _t)) = b
-                        && let Ok(b) = branch.name()
-                    {
-                        remote_branches.push(b.map_or_else(|| String::from("HEAD"), String::from));
-                    }
-                });
-            }
-        }
-        Self {
-            repo: repo_result,
-            local_branches,
-            remote_branches,
-            remotes,
-            current_branch,
-        }
-    }
-    pub fn status(&self) {}
 }
 
 ///
@@ -538,23 +468,40 @@ impl GitZen {
 ///
 pub fn zen() -> Result<i32, InquireError> {
     loop {
-        let option =
-            Select::new("@wishes".green().bold().to_string().as_str(), zen_menu()).prompt()?;
+        execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0))?;
+        let option = Select::new(
+            "@wishes".green().bold().to_string().as_str(),
+            ZenOption::all(),
+        )
+        .prompt()?;
         let response: Result<i32, Error> = match option {
-            ZenOption::Exit => Ok(QUIT),
+            ZenOption::Quit => {
+                execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0))?;
+                exit(QUIT);
+            }
             ZenOption::Add => call(vcs().as_str(), "add ."),
             ZenOption::Health => run_hooks(),
             ZenOption::Log => call(vcs().as_str(), "log"),
             ZenOption::Status => call(vcs().as_str(), "status"),
             ZenOption::Diff => call(vcs().as_str(), "diff"),
-            ZenOption::Email => call("aerc", "."),
+            ZenOption::Email => call("aerc", ""),
             ZenOption::ListTags => call(vcs().as_str(), "tag"),
-            ZenOption::Edit => call("boot", "."),
+            ZenOption::Edit => call("broot", "."),
+            ZenOption::Commit => {
+                if run_hooks().is_ok()
+                    && let Ok(c) = Commit::default().commit()
+                    && run_commit(c).is_ok()
+                {
+                    call(vcs().as_str(), "push")
+                } else {
+                    continue;
+                }
+            }
         };
-        if let Ok(status) = response
-            && status.eq(&QUIT)
+        if response.is_err() && Confirm::new("Exit").with_default(false).prompt()?
+            || response.is_ok() && Confirm::new("Exit").with_default(false).prompt()?
         {
-            return Ok(status);
+            exit(QUIT);
         }
     }
 }
@@ -563,7 +510,7 @@ fn run_hook(lang: Language, all: &mut HashMap<String, (bool, u64)>) -> Result<()
     all.insert(lang.to_string(), verify(&hooks)?);
     Ok(())
 }
-fn add_if_exists(file: &str, language: Language, vec: &mut Vec<Language>) -> Result<(), Error> {
+fn add_if_exists(file: &str, language: Language, vec: &mut Vec<Language>) {
     if language == CSharp
         && let Ok(files) = glob(file)
     {
@@ -574,7 +521,6 @@ fn add_if_exists(file: &str, language: Language, vec: &mut Vec<Language>) -> Res
                 vec.push(language);
             }
         }
-        Ok(())
     } else if language == D
         && let Ok(files) = glob(file)
     {
@@ -585,22 +531,15 @@ fn add_if_exists(file: &str, language: Language, vec: &mut Vec<Language>) -> Res
                 vec.push(language);
             }
         }
-        Ok(())
     } else if Path::new(file).is_file() {
         vec.push(language);
-        Ok(())
-    } else {
-        Err(Error::other("Failed to detect language."))
     }
 }
 #[must_use]
 pub fn detect() -> Vec<Language> {
     let mut all: Vec<Language> = Vec::new();
     for (l, file) in &LANGUAGES {
-        if add_if_exists(file, *l, &mut all).is_err() {
-            eprintln!("Failed to detect language.");
-            return all;
-        }
+        add_if_exists(file, *l, &mut all);
     }
     all
 }
