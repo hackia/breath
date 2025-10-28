@@ -512,6 +512,7 @@ impl Display for Commit {
         for resolve in &self.resolves {
             writeln!(f, "\t\tFixes #{resolve}")?;
         }
+        writeln!(f, "\n")?;
         Ok(())
     }
 }
