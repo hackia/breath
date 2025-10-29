@@ -17,7 +17,7 @@ pub const SWIFT_FILE: &str = "Package.swift";
 pub const PYTHON_FILE: &str = "requirements.txt";
 pub const TYPESCRIPT_FILE: &str = "tsconfig.json";
 pub const HASKELL_FILE: &str = "*.cabal";
-pub const D_FILE: &str = "dub.*";
+pub const D_FILE: &str = "dub.json";
 
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Tabled)]
 pub enum Language {
