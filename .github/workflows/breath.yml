@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: deps
-      run: sudo apt-get update -y && sudo apt-get install -y cargo-audit cargo-auditable
+      run: cargo install cargo-audit cargo-outdated
     - uses: actions/checkout@v4
     - name: Build
       run: cargo build --verbose
