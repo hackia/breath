@@ -445,7 +445,7 @@ impl Display for Role {
             Self::Tester => write!(f, "Tester"),
             Self::Packager => write!(f, "Packager"),
             Self::Product => write!(f, "Product"),
-            Self::Engineering => write!(f, "@Engineering"),
+            Self::Engineering => write!(f, "Engineering"),
             Self::Design => write!(f, "Design"),
             Self::Marketing => write!(f, "Marketing"),
             Self::Customer => write!(f, "Customer"),

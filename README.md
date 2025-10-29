@@ -1,39 +1,3 @@
-# What is Breath?
-
-Breath is a development companion tool designed to assist with creating structured and high-quality commit messages
-while ensuring code health. It aims to integrate seamlessly into the developer's workflow, offering features beyond a
-simple commit helper.
-
-Core Features:
-
-VCS Agnostic: Breath automatically detects whether your project uses Git or Mercurial (hg) by checking for .git or .hg
-directories.
-
-Convenience commands like breath status, log, diff, push, and pull are correctly proxied to the underlying version
-control system.
-
-Guided Interactive Commits: Instead of a simple commit -m, running breath commit launches an interactive wizard that
-prompts the user for structured input, including a commit "type" and "summary".
-
-It uses the inquire crate for these prompts.
-
-Expressive Typology: Breath employs a unique, space-themed commit typology (e.g., Star for features, Comet for fixes,
-Nebula for refactoring) to help create more descriptive and organized commit histories.
-
-Automatic Pre-Commit Health Checks: The breath health command (which is also integrated into the commit flow) acts as a
-quality gate.
-
-It detects the project's technology stack (Rust, Node.js, PHP, Go, etc.) by looking for marker files (Cargo.toml,
-package.json, etc.) and runs predefined hooks like formatting, linting, testing, and security audits. Hook outputs are
-logged for debugging.
-
-Automatic Pre-Commit Health Checks: The breath health command (which is also integrated into the commit flow) acts as a
-quality gate.
-
-It detects the project's technology stack (Rust, Node.js, PHP, Go, etc.) by looking for marker files (Cargo.toml,
-package.json, etc.) and runs predefined hooks like formatting, linting, testing, and security audits. Hook outputs are
-logged for debugging.
-
 <div align="center">
 
 ![breath](https://raw.githubusercontent.com/otechdo/zuu/refs/heads/main/zuu.png)
@@ -42,12 +6,92 @@ logged for debugging.
 
 </div>
 
-## Installation
+# What is Breath?
+
+Breath is an advanced developer companion tool meticulously crafted to streamline the process of creating structured and
+high-quality commit messages while simultaneously upholding stringent code health standards. This innovative solution is
+engineered for seamless integration into a developer's daily workflow, extending its utility far beyond that of a
+rudimentary commit helper. Breath acts as an intelligent assistant, guiding developers through the creation of clear,
+concise, and informative commit messages that adhere to predefined organizational or project-specific guidelines.
+
+Beyond its core function of commit message generation, Breath plays a crucial role in maintaining overall code quality.
+It actively analyzes code changes against established best practices, identifying potential issues before they are
+committed to the codebase. This proactive approach helps prevent the introduction of technical debt and ensures that the
+codebase remains robust and maintainable over time. By automating adherence to code health standards, Breath empowers
+development teams to consistently deliver high-quality software. Its comprehensive feature set makes it an indispensable
+asset for individual developers and large teams alike, fostering a culture of disciplined development and continuous
+improvement.
+
+Core Features:
+
+1. VCS Agnostic Compatibility: Breath offers exceptional flexibility by automatically detecting the version control
+   system in use within your project. It intelligently identifies whether your repository utilizes Git or Mercurial (hg)
+   by checking for the presence of .git or .hg directories at the project root. This ensures that Breath can adapt to
+   diverse development environments without requiring manual configuration.
+
+2. Seamless VCS Command Proxying: To enhance convenience and maintain a unified interface, Breath provides a set of
+   intuitive commands that proxy directly to the underlying version control system. Commands such as breath status,
+   breath log, breath diff, breath push, and breath pull are accurately translated and executed, allowing developers to
+   manage their VCS operations through a consistent Breath interface.
+
+3. Guided Interactive Commits: Moving beyond the simplicity of a commit -m command, breath commit initiates an
+   interactive wizard designed to guide the user through the creation of well-structured commit messages. This wizard
+   leverages the inquire crate to present clear and concise prompts, soliciting structured input from the user. This
+   includes critical elements such as a designated commit "type" and a comprehensive "summary," ensuring that each
+   commit is descriptive and informative.
+
+4. Expressive, Space-Themed Typology: Breath introduces a unique and memorable space-themed commit typology to foster
+   more descriptive and organized commit histories. This innovative approach assigns distinct "types" to commits, such
+   as "Star" for new features, "Comet" for bug fixes, and "Nebula" for refactoring efforts. This expressive typology not
+   only aids in classifying commit intent but also makes for a more engaging and easily navigable project history.
+
+5. Automatic Pre-Commit Health Checks: The breath health command serves as a critical quality gate, meticulously
+   integrated into the commit flow to ensure code integrity. Upon execution, or as part of the commit process, Breath
+   automatically detects the project's technology stack. This is achieved by scanning for characteristic marker files (
+   e.g., Cargo.toml for Rust, package.json for Node.js, etc.). Based on this detection, Breath then runs a series of
+   predefined hooks, which can include crucial tasks such as code formatting, linting, comprehensive testing, and
+   thorough security audits. The outputs of these hooks are meticulously logged, providing invaluable information for
+   debugging and ensuring that any potential issues are identified and addressed before code is committed. This robust
+   pre-commit health check system significantly elevates code quality and reduces the likelihood of introducing
+   regressions.
+
+## Why Choose Breath?
+
+In a crowded landscape of developer tools, Breath distinguishes itself as an all-encompassing solution that elevates
+both individual developer efficiency and overall team productivity.
+Here's why Breath is the indispensable companion your development workflow needs:
+
+- Enforce Code Quality Proactively: Unlike tools that merely report issues after they've been introduced, Breath acts as
+  a proactive guardian. Its automatic pre-commit health checks catch formatting errors, linting violations, and even
+  security vulnerabilities before code ever reaches your repository. This significantly reduces technical debt and
+  ensures a consistently high-quality codebase.
+
+- Standardize Commit Messages Effortlessly: Inconsistent commit messages can quickly turn a project's history into an
+  unnavigable mess. Breath's guided interactive commit wizard ensures that every commit adheres to predefined,
+  structured guidelines, making your project history clear, searchable, and informative for all team members.
+
+- Boost Developer Productivity: By automating routine tasks like code checks and simplifying the commit process, Breath
+  frees up developers to focus on what they do best: writing great code. The intuitive VCS command proxying and
+  interactive commit flow reduce mental overhead and streamline daily operations.
+
+- Adaptable to Any Project: With its VCS-agnostic compatibility, Breath seamlessly integrates into projects using either
+  Git or Mercurial without any additional configuration. Its intelligent detection of technology stacks ensures that the
+  right health checks are applied, making it a versatile tool for diverse development environments.
+
+- Foster a Culture of Discipline: Breath promotes disciplined development practices by making it easy to adhere to best
+  practices and project standards. This consistency across the team leads to more robust, maintainable, and ultimately,
+  more successful software projects.
+
+- Engaging and Intuitive Experience: The unique space-themed commit typology and interactive wizard not only make the
+  commit process more engaging but also contribute to a more understandable and easily navigable project history,
+  transforming a mundane task into a more intuitive experience.
+
+## How to install breath
 
 From crates.io:
 
 ```shell
-cargo install breath broot
+cargo install breath broot eza
 ```
 
 ## Usage
@@ -67,134 +111,131 @@ breath pull
 
 ```sh
 #!/usr/bin/env bash
-
+unset GIT_DIR
 breath health && exit 0 || exit 1
 ```
 
 ## Language supported
 
-- Rust
-- Python
-- Go
-- Java
-- C
-- C++
-- C#
-- JavaScript
-- TypeScript
-- PHP
-- Shell
-- Ruby
-- Swift
-- Kotlin
-- Scala
-- Rust
-- Dart
-- Elixir
-- Erlang
-- Haskell
-- Lua
-- OCaml
-- Perl
-- R
-- Scala
-- Swift
-- Visual Basic
-- Visual Basic .NET
-- Visual C++
+| language   | supported   |
+|------------|-------------|
+| Javascript | yes         |
+| Typescript | yes         |
+| Python     | yes         |
+| Go         | yes         |
+| Java       | yes         |
+| C          | yes         |
+| D          | yes         |
+| C++        | yes         |
+| C#         | yes         |
+| Ruby       | yes         |
+| Swift      | yes         |
+| Kotlin     | yes         |
+| Scala      | in progress |
+| Rust       | yes         |
+| Dart       | yes         |
+| Elixir     | yes         |
+| Erlang     | in progress |
+| Haskell    | yes         |
+| Lua        | in progress |
+| OCaml      | in progress |
+| Perl       | in progress |
+| R          | in progress |
+| Scala      | in progress |
+| Swift      | yes         |
+| Php        | yes         |    
+ 
 
 ## Commit message format
 
 ```text
 <type> ~ <summary>
 
-Why changes?
-
-    <details> 
-
-Breaking Changes:
-
-    <breaking changes>
-
-What changes?
-
-    <what details>
-
-Who changes?
-
-    <author> ~ <roles>
+    Why changes?
     
-Benefits:
-
-    <benefice>
-
-Notes:
-
-    <team message>
-
-Resolves
+        * <details> 
     
-    Fixes #<issues>
-    ...
+    Breaking Changes:
+    
+        * <breaking changes>
+    
+    What changes?
+    
+        * <what details>
+    
+    Who changes?
+    
+        <author> ~ <roles>
+        
+    Benefits:
+    
+        * <benefice>
+    
+    Notes:
+    
+        * <team message>
+    
+    Resolves
+        
+        Fixes #<issues>
 ```
-
 
 ## Commit message example
 
 ```text
 Nebula ~ update commit display logic
 
-Why changes?
-
-    The previous implementation of `Display` for the `Commit` struct was becoming hard to maintain.
-
-    The order of sections was confusing  (e.g., `When changes` contained implementation details).
-
-    Adding new sections like `Benefits` or `Breaking Changes` required significant code modification.
-
-    This refactoring addresses these issues based on team feedback.
-
-Breaking Changes:
+    Why changes?
     
-    None.
+        * The previous implementation of `Display` for the `Commit` struct was becoming hard to maintain.
     
-    This change only affects the internal display logic and the final text output format.
+        * The order of sections was confusing  (e.g., `When changes` contained implementation details).
     
-    The command-line interface and core functionality remain unchanged.
+        * Adding new sections like `Benefits` or `Breaking Changes` required significant code modification.
     
-What changes?
-
-    Refactored the `impl Display for Commit` block in `src/commit.rs`.
+        * This refactoring addresses these issues based on team feedback.
     
-    Introduced helper functions to conditionally render sections only if they contain meaningful content.
+    Breaking Changes:
+        
+        * None.
+        
+        * This change only affects the internal display logic and the final text output format.
+        
+        * The command-line interface and core functionality remain unchanged.
+        
+    What changes?
     
-    Renamed the section previously titled `When changes` to `What changes` to accurately reflect its content.
+        * Refactored the `impl Display for Commit` block in `src/commit.rs`.
+        
+        * Introduced helper functions to conditionally render sections only if they contain meaningful content.
+        
+        * Renamed the section previously titled `When changes` to `What changes` to accurately reflect its content.
+        
+        * Added new sections `Benefits` and `Breaking Changes` to the output format.
+        
+        * Updated the display logic for `Who changes` to remove leading `@` symbols for roles, improving readability.
     
-    Added new sections `Benefits` and `Breaking Changes` to the output format.
+    Who changes?
+        
+        * @hackia ~ Developer
     
-    Updated the display logic for `Who changes` to remove leading `@` symbols for roles, improving readability.
-
-Who changes?
+    Benefits:
+        
+        * This change makes it easier to understand the commit type and its purpose.
+        
+        * It also makes it easier to remember the commit type `Star` than `Feature`.
+        
+        * It also makes it easier to understand the commit type `Star` than `Feature`.
+        
+    Notes:
     
-    hackia ~ Developer
-
-Benefits:
+        * This change implements the structure discussed in our recent sync about improving commit message quality.
+        
+        * Please review the new format and provide feedback.
     
-    This change makes it easier to understand the commit type and its purpose.
+    Resolves
     
-    It also makes it easier to remember the commit type `Star` than `Feature`.
-    
-    It also makes it easier to understand the commit type `Star` than `Feature`.
-    
-Notes:
-
-    This change implements the structure discussed in our recent sync about improving commit message quality.
-    
-    Please review the new format and provide feedback.
-
-Resolves
-
-    Fixes #15 
+        Fixes #15 
 ```
 
 ## Why cosmic types and not just categories?

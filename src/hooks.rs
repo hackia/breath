@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 use tabled::Tabled;
+
 pub const CS_PROJ: &str = "*.csproj";
 pub const MAVEN_POM: &str = "pom.xml";
 pub const GRADLE_BUILD: &str = "build.gradle";
@@ -21,6 +22,7 @@ pub const D_FILE: &str = "dub.*";
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, Tabled)]
 pub enum Language {
     Unknown,
+    R,
     Javascript,
     Typescript,
     Haskell,
@@ -118,7 +120,7 @@ impl Language {
             Self::Dart => DART_FILE,
             Self::Elixir => ELIXIR_FILE,
             Self::D => D_FILE,
-            Self::Unknown => "",
+            Self::R | Self::Unknown => "",
         }
     }
 }
@@ -163,6 +165,7 @@ impl Display for Language {
             Self::D => write!(f, "D"),
             Self::Unknown => write!(f, "Unknown"),
             Self::Haskell => write!(f, "Haskell"),
+            Self::R => write!(f, "R"),
         }
     }
 }
@@ -194,31 +197,8 @@ impl Hook {
             file: "test.log",
             command: "dub test",
         });
-        hooks.push(Self {
-            language: Language::D,
-            description: "Checking format",
-            success: "Format check passed",
-            failure: "Format check failed",
-            file: "format.log",
-            command: "dub format --check",
-        });
-        hooks.push(Self {
-            language: Language::D,
-            description: "Checking for outdated packages",
-            success: "No outdated packages found",
-            failure: "Outdated packages found",
-            file: "outdated.log",
-            command: "dub outdated",
-        });
-        hooks.push(Self {
-            language: Language::D,
-            description: "Generating documentation for your project",
-            success: "Documentation generated successfully",
-            failure: "Failed to generate documentation",
-            file: "docs.log",
-            command: "dub docs",
-        });
     }
+
     pub fn haskell(hooks: &mut Vec<Self>) {
         hooks.push(Self {
             language: Language::Haskell,
@@ -246,29 +226,22 @@ impl Hook {
         });
     }
     pub fn typescript(hooks: &mut Vec<Self>) {
+        Self::javascript(hooks);
         hooks.push(Self {
             language: Language::Typescript,
-            description: "Testing your project",
-            success: "Tests passed",
-            failure: "Tests failed",
-            file: "test.log",
-            command: "npm run test",
+            description: "Checking for type in your project",
+            success: "Types are valid",
+            failure: "Type errors found",
+            file: "types.log",
+            command: "npx tsc --noEmit",
         });
         hooks.push(Self {
             language: Language::Typescript,
-            description: "Auditing your project",
-            success: "No vulnerabilities found",
-            failure: "Vulnerabilities found",
-            file: "audit.log",
-            command: "npm audit",
-        });
-        hooks.push(Self {
-            language: Language::Typescript,
-            description: "Checking for outdated packages in your project",
-            success: "No outdated packages found",
-            failure: "Outdated packages found",
-            file: "outdated.log",
-            command: "npm outdated",
+            description: "Checking for code formatting in your project",
+            success: "Code is formatted correctly",
+            failure: "Code formating issues found",
+            file: "fmt.log",
+            command: "npx prettier --check .",
         });
     }
     pub fn maven(hooks: &mut Vec<Self>) {
@@ -356,6 +329,14 @@ impl Hook {
             failure: "Vulnerabilities found",
             file: "audit.log",
             command: "npm audit",
+        });
+        hooks.push(Self {
+            language: Language::Javascript,
+            description: "Checking for code formatting in your project",
+            success: "Linting passed",
+            failure: "Lint error found",
+            file: "lint.log",
+            command: "npm run lint",
         });
     }
     pub fn rust(hooks: &mut Vec<Self>) {
@@ -711,22 +692,11 @@ impl Hook {
             command: "mix compile",
         });
     }
-
-    fn kotlin(hooks: &mut Vec<Self>) {
-        hooks.push(Self {
-            language: Language::Kotlin,
-            description: "",
-            success: "",
-            failure: "",
-            file: "",
-            command: "",
-        });
-    }
     #[must_use]
     pub fn get(language: Language) -> Vec<Self> {
         let mut hooks: Vec<Self> = vec![];
         match language {
-            Language::Unknown => {}
+            Language::Unknown | Language::R | Language::Kotlin => {}
             Language::Typescript => Self::typescript(&mut hooks),
             Language::D => Self::d(&mut hooks),
             Language::Haskell => Self::haskell(&mut hooks),
@@ -743,7 +713,6 @@ impl Hook {
             Language::Swift => Self::swift(&mut hooks),
             Language::Dart => Self::dart(&mut hooks),
             Language::Elixir => Self::elixir(&mut hooks),
-            Language::Kotlin => Self::kotlin(&mut hooks),
         }
         hooks
     }
