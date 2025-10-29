@@ -2,7 +2,7 @@
 
 ![breath](https://raw.githubusercontent.com/otechdo/zuu/refs/heads/main/zuu.png)
 
-![Version](https://img.shields.io/crates/v/breath.svg) ![License](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)
+[![Breath](https://github.com/hackia/breath/actions/workflows/breath.yml/badge.svg)](https://github.com/hackia/breath/actions/workflows/breath.yml) [Version](https://img.shields.io/crates/v/breath.svg) ![License](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)
 
 </div>
 
