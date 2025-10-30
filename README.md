@@ -25,35 +25,35 @@ improvement.
 Core Features:
 
 1. VCS Agnostic Compatibility: Breath offers exceptional flexibility by automatically detecting the version control
-   system in use within your project. It intelligently identifies whether your repository utilizes Git or Mercurial (hg)
-   by checking for the presence of .git or .hg directories at the project root. This ensures that Breath can adapt to
-   diverse development environments without requiring manual configuration.
+system in use within your project. It intelligently identifies whether your repository utilizes Git or Mercurial (hg)
+by checking for the presence of .git or .hg directories at the project root. This ensures that Breath can adapt to
+diverse development environments without requiring manual configuration.
 
 2. Seamless VCS Command Proxying: To enhance convenience and maintain a unified interface, Breath provides a set of
-   intuitive commands that proxy directly to the underlying version control system. Commands such as breath status,
-   breath log, breath diff, breath push, and breath pull are accurately translated and executed, allowing developers to
-   manage their VCS operations through a consistent Breath interface.
+intuitive commands that proxy directly to the underlying version control system. Commands such as breath status,
+breath log, breath diff, breath push, and breath pull are accurately translated and executed, allowing developers to
+manage their VCS operations through a consistent Breath interface.
 
 3. Guided Interactive Commits: Moving beyond the simplicity of a commit -m command, breath commit initiates an
-   interactive wizard designed to guide the user through the creation of well-structured commit messages. This wizard
-   leverages the inquire crate to present clear and concise prompts, soliciting structured input from the user. This
-   includes critical elements such as a designated commit "type" and a comprehensive "summary," ensuring that each
-   commit is descriptive and informative.
+interactive wizard designed to guide the user through the creation of well-structured commit messages. This wizard
+leverages the inquire crate to present clear and concise prompts, soliciting structured input from the user. This
+includes critical elements such as a designated commit "type" and a comprehensive "summary," ensuring that each
+commit is descriptive and informative.
 
 4. Expressive, Space-Themed Typology: Breath introduces a unique and memorable space-themed commit typology to foster
-   more descriptive and organized commit histories. This innovative approach assigns distinct "types" to commits, such
-   as "Star" for new features, "Comet" for bug fixes, and "Nebula" for refactoring efforts. This expressive typology not
-   only aids in classifying commit intent but also makes for a more engaging and easily navigable project history.
+more descriptive and organized commit histories. This innovative approach assigns distinct "types" to commits, such
+as "Star" for new features, "Comet" for bug fixes, and "Nebula" for refactoring efforts. This expressive typology not
+only aids in classifying commit intent but also makes for a more engaging and easily navigable project history.
 
 5. Automatic Pre-Commit Health Checks: The breath health command serves as a critical quality gate, meticulously
-   integrated into the commit flow to ensure code integrity. Upon execution, or as part of the commit process, Breath
-   automatically detects the project's technology stack. This is achieved by scanning for characteristic marker files (
-   e.g., Cargo.toml for Rust, package.json for Node.js, etc.). Based on this detection, Breath then runs a series of
-   predefined hooks, which can include crucial tasks such as code formatting, linting, comprehensive testing, and
-   thorough security audits. The outputs of these hooks are meticulously logged, providing invaluable information for
-   debugging and ensuring that any potential issues are identified and addressed before code is committed. This robust
-   pre-commit health check system significantly elevates code quality and reduces the likelihood of introducing
-   regressions.
+integrated into the commit flow to ensure code integrity. Upon execution, or as part of the commit process, Breath
+automatically detects the project's technology stack. This is achieved by scanning for characteristic marker files (
+e.g., Cargo.toml for Rust, package.json for Node.js, etc.). Based on this detection, Breath then runs a series of
+predefined hooks, which can include crucial tasks such as code formatting, linting, comprehensive testing, and
+thorough security audits. The outputs of these hooks are meticulously logged, providing invaluable information for
+debugging and ensuring that any potential issues are identified and addressed before code is committed. This robust
+pre-commit health check system significantly elevates code quality and reduces the likelihood of introducing
+regressions.
 
 ## Why Choose Breath?
 

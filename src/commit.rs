@@ -1,11 +1,17 @@
 use crate::utils::types;
 use inquire::error::InquireResult;
 use inquire::{Confirm, Editor, InquireError, MultiSelect, Select, Text};
+use serde::Deserialize;
 use std::fmt::{Display, Formatter};
+use std::fs::read_to_string;
 use std::io::Error;
 use std::path::Path;
 use std::process::Command;
 
+#[derive(Deserialize)]
+struct Config {
+    scopes: Vec<String>,
+}
 #[derive(Debug)]
 #[doc = "Represent a commit type"]
 pub struct CommitType {
@@ -393,6 +399,7 @@ pub fn run_commit(c: &mut Commit) -> Result<i32, Error> {
 #[derive(Default, Debug, Clone)]
 pub struct Commit {
     pub t: String,
+    pub scopes: Vec<String>,
     pub summary: String,
     pub why: String,
     pub who: String,
@@ -455,7 +462,13 @@ impl Display for Role {
 
 impl Display for Commit {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{} ~ {}", self.t, self.summary)?;
+        writeln!(
+            f,
+            "{}({}) ~ {}",
+            self.t,
+            self.scopes.join(","),
+            self.summary
+        )?;
         writeln!(f, "\n\tWhy changes?\n")?;
         let why_lines = self.why.split('\n').collect::<Vec<&str>>();
         for line in why_lines {
@@ -547,6 +560,7 @@ impl Commit {
     ///
     pub fn commit(&mut self) -> InquireResult<&mut Self> {
         self.ask_type()?
+            .ask_scopes()?
             .ask_summary()?
             .ask_roles()?
             .ask_why()?
@@ -686,6 +700,34 @@ impl Commit {
                 .prompt()?
                 .as_str(),
         );
+        Ok(self)
+    }
+
+    ///
+    /// What code resolve
+    ///
+    /// # Panics
+    /// if bad config
+    ///
+    /// # Errors
+    /// On bad user inputs
+    ///
+    pub fn ask_scopes(&mut self) -> InquireResult<&mut Self> {
+        self.scopes.clear();
+        if Path::new("breathes.toml").is_file().eq(&false) {
+            let scopes = Text::new("Enter scopes separated by commas:").prompt()?;
+            for scope in scopes.split(',') {
+                self.scopes.push(scope.trim().to_string());
+            }
+        } else {
+            let mut scopes = Vec::new();
+            let conf: Config = toml::from_str(read_to_string("breathes.toml")?.as_str())
+                .expect("bad breathes.toml");
+            for scope in &conf.scopes {
+                scopes.push(scope.to_string());
+            }
+            self.scopes = MultiSelect::new("Select scopes", scopes).prompt()?;
+        }
         Ok(self)
     }
 
