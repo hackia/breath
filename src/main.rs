@@ -1,7 +1,11 @@
+pub mod api;
 pub mod commit;
 pub mod hooks;
 pub mod utils;
+
+pub mod issues;
 use crate::commit::{Commit, run_commit, vcs};
+use crate::issues::get_issues;
 use crate::utils::{call, run_hooks, zen};
 use clap::Arg;
 use std::process::ExitCode;
@@ -36,7 +40,9 @@ fn breathes() -> clap::ArgMatches {
         .get_matches()
 }
 
-fn main() -> ExitCode {
+#[tokio::main]
+#[must_use]
+pub async fn main() -> ExitCode {
     let mut commit = Commit::new();
     let app = breathes();
 
@@ -49,7 +55,7 @@ fn main() -> ExitCode {
             }
         }
         Some(("zen", _)) => {
-            if zen().is_err() {
+            if zen().await.is_err() {
                 ExitCode::FAILURE
             } else {
                 ExitCode::SUCCESS
@@ -57,13 +63,15 @@ fn main() -> ExitCode {
         }
         Some(("commit", _)) => {
             if run_hooks().is_ok() {
-                commit.commit().map_or(ExitCode::FAILURE, |c| {
-                    if run_commit(c).is_err() {
-                        ExitCode::FAILURE
-                    } else {
-                        ExitCode::SUCCESS
-                    }
-                })
+                commit
+                    .commit(&get_issues().await.expect("failed to get issues"))
+                    .map_or(ExitCode::FAILURE, |c| {
+                        if run_commit(c).is_err() {
+                            ExitCode::FAILURE
+                        } else {
+                            ExitCode::SUCCESS
+                        }
+                    })
             } else {
                 // Les hooks ont échoué
                 ExitCode::FAILURE

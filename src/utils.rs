@@ -1,6 +1,7 @@
-use crate::commit::{COMMIT_TYPES, Commit, run_commit, vcs};
+use crate::commit::{Commit, run_commit, vcs};
 use crate::hooks::Language::{CSharp, D};
 use crate::hooks::{Hook, LANGUAGES, Language};
+use crate::issues::get_issues;
 use crossterm::cursor::MoveTo;
 use crossterm::execute;
 use crossterm::style::Stylize;
@@ -12,7 +13,7 @@ use regex::Regex;
 use spinners::{Spinner, Spinners};
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
-use std::fs::{File, create_dir_all};
+use std::fs::{File, create_dir_all, read_to_string};
 use std::io::{Error, stdout};
 use std::path::{MAIN_SEPARATOR_STR, Path};
 use std::process::{Command, exit};
@@ -126,60 +127,17 @@ pub fn call(program: &str, arg: &str) -> Result<i32, Error> {
     Ok(OK)
 }
 
-/// Returns a sorted list of formatted commit type strings.
-///
-/// This function operates on a predefined constant `COMMIT_TYPES`, which is assumed
-/// to be a collection of commit type objects. Each object contains the following fields:
-/// `type_name`, `description`, `category`, and `mnemonic`.
-///
-/// For each commit type object, the function generates a formatted string that concatenates
-/// its fields (`type_name`, `description`, `category`, and `mnemonic`), separated by ` ~ `.
-/// Additionally, any commas in the values of these fields are removed to ensure clean formatting.
-///
-/// The resulting list of formatted strings is sorted alphabetically before being returned.
-///
-/// # Returns
-/// * `Vec<String>` - A sorted vector of formatted commit type strings.
-///
-/// # Example
-/// Given the following `COMMIT_TYPES` structure:
-/// ```rust
-/// const COMMIT_TYPES: [CommitType; 2] = [
-///     CommitType {
-///         type_name: "feat",
-///         description: "A new feature",
-///         category: "Feature",
-///         mnemonic: "F",
-///     },
-///     CommitType {
-///         type_name: "fix",
-///         description: "A bug fix",
-///         category: "Bug Fix",
-///         mnemonic: "B",
-///     },
-/// ];
-/// ```
-/// Calling the `types` function will return:
-/// ```rust
-/// vec![
-///     "feat ~ A new feature ~ Feature ~ F",
-///     "fix ~ A bug fix ~ Bug Fix ~ B",
-/// ];
-/// ```
+/// # Panics
+/// if failed to parse breathes.toml
 #[must_use]
 pub fn types() -> Vec<String> {
-    let mut types = COMMIT_TYPES
-        .iter()
-        .map(|t| {
-            format!(
-                "{} ~ {} ~ {} ~ {}",
-                t.type_name.to_string().replace(',', ""),
-                t.description.to_string().replace(',', ""),
-                t.category.to_string().replace(',', ""),
-                t.mnemonic.to_string().replace(',', ""),
-            )
-        })
-        .collect::<Vec<String>>();
+    let conf: crate::commit::Config = toml::from_str(
+        read_to_string("breathes.toml")
+            .expect("failed to parse breathes.toml")
+            .as_str(),
+    )
+    .expect("bad breathes.toml");
+    let mut types = conf.types;
     types.sort();
     types
 }
@@ -360,13 +318,13 @@ pub fn run_hooks() -> Result<i32, Error> {
         response.push(status.0);
         if status.0 {
             table.push_record([
-                language.to_string(),
+                language.clone(),
                 "Success".to_string(),
                 format!("{}s", status.1),
             ]);
         } else {
             table.push_record([
-                language.to_string(),
+                language.clone(),
                 "Failure".to_string(),
                 format!("{}s", status.1),
             ]);
@@ -462,15 +420,24 @@ impl From<&str> for ZenOption {
 ///
 /// Interact with the developer.
 ///
-/// # Errors
-///
+/// # Panics
 /// On bad input
+/// # Errors
+/// - If there is an issue reading the command's stderr output.
+/// - If there is an issue executing a command.
+/// - If there is an issue creating a file.
+/// - If there is an issue clearing the terminal screen.
+/// - If there is an issue writing to a file.
+/// # Dependencies
+/// - `crossterm` for terminal manipulation.
+/// - `git` for version control.
+/// - `git-commit-template` for commit templates.
 ///
-pub fn zen() -> Result<i32, InquireError> {
+pub async fn zen() -> Result<i32, InquireError> {
     loop {
         execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0))?;
         let option = Select::new(
-            "@wishes".green().bold().to_string().as_str(),
+            "@wishes:".green().bold().to_string().as_str(),
             ZenOption::all(),
         )
         .prompt()?;
@@ -489,7 +456,8 @@ pub fn zen() -> Result<i32, InquireError> {
             ZenOption::Edit => call("broot", "."),
             ZenOption::Commit => {
                 if run_hooks().is_ok()
-                    && let Ok(c) = Commit::default().commit()
+                    && let Ok(c) =
+                        Commit::default().commit(&get_issues().await.expect("failed to get issues"))
                     && run_commit(c).is_ok()
                 {
                     call(vcs().as_str(), "push")
