@@ -410,123 +410,123 @@ impl Commit {
         self.who.clear();
         let conf: Config =
             toml::from_str(read_to_string("breathes.toml")?.as_str()).expect("bad breathes.toml");
-            while self.who.is_empty() {
-                self.who.clear();
-                self.who.push_str(
-                    Text::new("Who are you:")
-                        .with_default(conf.me.as_str())
-                        .prompt()?
-                        .as_str(),
-                );
-            }
-            if self.who.is_empty() {
-                return Err(InquireError::from(Error::other("bad who")));
-            }
-            Ok(self)
+        while self.who.is_empty() {
+            self.who.clear();
+            self.who.push_str(
+                Text::new("Who are you:")
+                    .with_default(conf.me.as_str())
+                    .prompt()?
+                    .as_str(),
+            );
         }
-
-        ///
-        /// What changes are you making?
-        ///
-        /// # Errors
-        ///
-        /// On bad user inputs
-        ///
-        pub fn ask_what(&mut self) -> InquireResult<&mut Self> {
-            self.what.clear();
-            while self.what.is_empty() {
-                self.what.clear();
-                self.what.push_str(
-                    Editor::new("What changes are you making?")
-                        .prompt()?
-                        .as_str(),
-                );
-            }
-            if self.what.is_empty() {
-                return Err(InquireError::from(Error::other("bad what")));
-            }
-            Ok(self)
+        if self.who.is_empty() {
+            return Err(InquireError::from(Error::other("bad who")));
         }
-
-        ///
-        /// What code resolve
-        ///
-        /// # Errors
-        ///
-        /// On bad user inputs
-        ///
-        pub fn ask_benefits(&mut self) -> InquireResult<&mut Self> {
-            self.benefits.clear();
-            while self.benefits.is_empty() {
-                self.benefits.clear();
-                self.benefits.push_str(
-                    Editor::new("What benefits does this change provide?")
-                        .prompt()?
-                        .as_str(),
-                );
-            }
-            Ok(self)
-        }
-
-        /// # Panics
-        /// if bad config
-        /// # Errors
-        /// On bad user inputs
-        pub fn ask_resolves(&mut self) -> InquireResult<&mut Self> {
-            self.resolves.clear();
-            while self.resolves.is_empty() {
-                self.resolves.clear();
-                self.resolves.push(Text::new("Issues:").prompt()?);
-            }
-            if self.resolves.is_empty() {
-                return Err(InquireError::from(Error::other("bad resolves")));
-            }
-            Ok(self)
-        }
-
-        ///
-        /// What code resolve
-        ///
-        /// # Panics
-        /// if bad config
-        ///
-        /// # Errors
-        /// On bad user inputs
-        ///
-        pub fn ask_scopes(&mut self) -> InquireResult<&mut Self> {
-            self.scopes.clear();
-            let mut scopes = Vec::new();
-            let conf: Config =
-                toml::from_str(read_to_string("breathes.toml")?.as_str()).expect("bad breathes.toml");
-            for scope in &conf.scopes {
-                scopes.push(scope.clone());
-            }
-            while self.scopes.is_empty() {
-                self.scopes.clear();
-                self.scopes = MultiSelect::new("Select scopes", scopes.clone()).prompt()?;
-            }
-            if self.scopes.is_empty() {
-                return Err(InquireError::from(Error::other("bad scopes")));
-            }
-            Ok(self)
-        }
-
-        ///
-        /// Ask for after changes
-        ///
-        /// # Errors
-        /// On bad user inputs
-        ///
-        pub fn breaking_changes(&mut self) -> InquireResult<&mut Self> {
-            self.breaking_changes.clear();
-            while self.breaking_changes.is_empty() {
-                self.breaking_changes.clear();
-                self.breaking_changes
-                    .push_str(Editor::new("Breaking changes?").prompt()?.as_str());
-            }
-            if self.breaking_changes.is_empty() {
-                return Err(InquireError::from(Error::other("bad breaking changes")));
-            }
-            Ok(self)
-        }
+        Ok(self)
     }
+
+    ///
+    /// What changes are you making?
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
+    pub fn ask_what(&mut self) -> InquireResult<&mut Self> {
+        self.what.clear();
+        while self.what.is_empty() {
+            self.what.clear();
+            self.what.push_str(
+                Editor::new("What changes are you making?")
+                    .prompt()?
+                    .as_str(),
+            );
+        }
+        if self.what.is_empty() {
+            return Err(InquireError::from(Error::other("bad what")));
+        }
+        Ok(self)
+    }
+
+    ///
+    /// What code resolve
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
+    pub fn ask_benefits(&mut self) -> InquireResult<&mut Self> {
+        self.benefits.clear();
+        while self.benefits.is_empty() {
+            self.benefits.clear();
+            self.benefits.push_str(
+                Editor::new("What benefits does this change provide?")
+                    .prompt()?
+                    .as_str(),
+            );
+        }
+        Ok(self)
+    }
+
+    /// # Panics
+    /// if bad config
+    /// # Errors
+    /// On bad user inputs
+    pub fn ask_resolves(&mut self) -> InquireResult<&mut Self> {
+        self.resolves.clear();
+        while self.resolves.is_empty() {
+            self.resolves.clear();
+            self.resolves.push(Text::new("Issues:").prompt()?);
+        }
+        if self.resolves.is_empty() {
+            return Err(InquireError::from(Error::other("bad resolves")));
+        }
+        Ok(self)
+    }
+
+    ///
+    /// What code resolve
+    ///
+    /// # Panics
+    /// if bad config
+    ///
+    /// # Errors
+    /// On bad user inputs
+    ///
+    pub fn ask_scopes(&mut self) -> InquireResult<&mut Self> {
+        self.scopes.clear();
+        let mut scopes = Vec::new();
+        let conf: Config =
+            toml::from_str(read_to_string("breathes.toml")?.as_str()).expect("bad breathes.toml");
+        for scope in &conf.scopes {
+            scopes.push(scope.clone());
+        }
+        while self.scopes.is_empty() {
+            self.scopes.clear();
+            self.scopes = MultiSelect::new("Select scopes", scopes.clone()).prompt()?;
+        }
+        if self.scopes.is_empty() {
+            return Err(InquireError::from(Error::other("bad scopes")));
+        }
+        Ok(self)
+    }
+
+    ///
+    /// Ask for after changes
+    ///
+    /// # Errors
+    /// On bad user inputs
+    ///
+    pub fn breaking_changes(&mut self) -> InquireResult<&mut Self> {
+        self.breaking_changes.clear();
+        while self.breaking_changes.is_empty() {
+            self.breaking_changes.clear();
+            self.breaking_changes
+                .push_str(Editor::new("Breaking changes?").prompt()?.as_str());
+        }
+        if self.breaking_changes.is_empty() {
+            return Err(InquireError::from(Error::other("bad breaking changes")));
+        }
+        Ok(self)
+    }
+}
