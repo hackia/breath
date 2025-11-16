@@ -6,20 +6,23 @@ on:
       - develop
   pull_request:
     branches:
-    - master
-    - develop
+      - master
+      - develop
 env:
   CARGO_TERM_COLOR: always
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-    - name: deps
-      run: cargo install cargo-audit cargo-outdated
-    - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
-    - name: Breath
-      run: cargo run -- health
+      - name: deps
+        run: cargo install cargo-audit cargo-outdated
+      - uses: actions/checkout@v4
+      - name: Build
+        run: cargo build --verbose
+      - name: Run tests
+        run: cargo test --verbose
+      - name: Breath
+        run: cargo run -- health

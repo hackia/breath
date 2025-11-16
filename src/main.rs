@@ -1,11 +1,9 @@
-pub mod api;
 pub mod commit;
 pub mod hooks;
 pub mod utils;
 
 pub mod issues;
 use crate::commit::{Commit, run_commit, vcs};
-use crate::issues::get_issues;
 use crate::utils::{call, run_hooks, zen};
 use clap::Arg;
 use std::process::ExitCode;
@@ -40,9 +38,8 @@ fn breathes() -> clap::ArgMatches {
         .get_matches()
 }
 
-#[tokio::main]
 #[must_use]
-pub async fn main() -> ExitCode {
+pub fn main() -> ExitCode {
     let mut commit = Commit::new();
     let app = breathes();
 
@@ -55,7 +52,7 @@ pub async fn main() -> ExitCode {
             }
         }
         Some(("zen", _)) => {
-            if zen().await.is_err() {
+            if zen().is_err() {
                 ExitCode::FAILURE
             } else {
                 ExitCode::SUCCESS
@@ -63,21 +60,17 @@ pub async fn main() -> ExitCode {
         }
         Some(("commit", _)) => {
             if run_hooks().is_ok() {
-                commit
-                    .commit(&get_issues().await.expect("failed to get issues"))
-                    .map_or(ExitCode::FAILURE, |c| {
-                        if run_commit(c).is_err() {
-                            ExitCode::FAILURE
-                        } else {
-                            ExitCode::SUCCESS
-                        }
-                    })
+                commit.commit().map_or(ExitCode::FAILURE, |c| {
+                    if run_commit(c).is_err() {
+                        ExitCode::FAILURE
+                    } else {
+                        ExitCode::SUCCESS
+                    }
+                })
             } else {
-                // Les hooks ont échoué
                 ExitCode::FAILURE
             }
         }
-        // Ce bloc corrige toutes les erreurs de répétition
         Some((cmd @ ("push" | "pull" | "status" | "log" | "diff"), _)) => {
             if call(vcs().as_str(), cmd).is_ok() {
                 ExitCode::SUCCESS

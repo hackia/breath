@@ -1,7 +1,6 @@
 use crate::commit::{Commit, run_commit, vcs};
 use crate::hooks::Language::{CSharp, D};
 use crate::hooks::{Hook, LANGUAGES, Language};
-use crate::issues::get_issues;
 use crossterm::cursor::MoveTo;
 use crossterm::execute;
 use crossterm::style::Stylize;
@@ -36,6 +35,7 @@ impl StringValidator for EmailValidator {
         }
     }
 }
+
 /// Executes a command and provides real-time visual feedback while processing.
 ///
 /// This function displays a spinner animation while a command is executed. If the command
@@ -141,6 +141,7 @@ pub fn types() -> Vec<String> {
     types.sort();
     types
 }
+
 /// Verifies the quality, formatting, and security of a Rust project through a series of checks.
 ///
 /// This function performs the following tasks sequentially:
@@ -205,26 +206,47 @@ pub fn verify(hooks: &[Hook]) -> Result<(bool, u64), Error> {
             hook.language
         ))?;
 
-        if ok(
-            hook.description,
-            Command::new("sh").arg("-c")
-                .arg(hook.command)
-                .current_dir(".")
-                .stderr(
-                    File::create(format!("breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stderr{MAIN_SEPARATOR_STR}{}", hook.language, hook.file))?
-                )
-                .stdout(
-                    File::create(format!("breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stdout{MAIN_SEPARATOR_STR}{}", hook.language, hook.file))?
-                ),
-            hook.success,
-            hook.failure,
-        )
-            .is_err()
-        {
-            status.push(false);
-        } else {
-            status.push(true);
-        }
+        if cfg!(target_os = "windows") {
+            if ok(
+                hook.description,
+                Command::new("cmd").arg("/C")
+                    .arg(hook.command)
+                    .current_dir(".")
+                    .stderr(
+                        File::create(format!("breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stderr{MAIN_SEPARATOR_STR}{}", hook.language, hook.file))?
+                    )
+                    .stdout(
+                        File::create(format!("breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stdout{MAIN_SEPARATOR_STR}{}", hook.language, hook.file))?
+                    ),
+                hook.success,
+                hook.failure,
+            )
+                .is_err()
+            {
+                status.push(false);
+            } else {
+                status.push(true);
+            }
+        } else if ok(
+                hook.description,
+                Command::new("sh").arg("-c")
+                    .arg(hook.command)
+                    .current_dir(".")
+                    .stderr(
+                        File::create(format!("breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stderr{MAIN_SEPARATOR_STR}{}", hook.language, hook.file))?
+                    )
+                    .stdout(
+                        File::create(format!("breathes{MAIN_SEPARATOR_STR}{}{MAIN_SEPARATOR_STR}stdout{MAIN_SEPARATOR_STR}{}", hook.language, hook.file))?
+                    ),
+                hook.success,
+                hook.failure,
+            )
+                .is_err()
+            {
+                status.push(false);
+            } else {
+                status.push(true);
+            }
     }
     Ok((
         status.contains(&false).eq(&false),
@@ -433,7 +455,7 @@ impl From<&str> for ZenOption {
 /// - `git` for version control.
 /// - `git-commit-template` for commit templates.
 ///
-pub async fn zen() -> Result<i32, InquireError> {
+pub fn zen() -> Result<i32, InquireError> {
     loop {
         execute!(stdout(), Clear(ClearType::All), MoveTo(0, 0))?;
         let option = Select::new(
@@ -456,8 +478,7 @@ pub async fn zen() -> Result<i32, InquireError> {
             ZenOption::Edit => call("broot", "."),
             ZenOption::Commit => {
                 if run_hooks().is_ok()
-                    && let Ok(c) =
-                        Commit::default().commit(&get_issues().await.expect("failed to get issues"))
+                    && let Ok(c) = Commit::default().commit()
                     && run_commit(c).is_ok()
                 {
                     call(vcs().as_str(), "push")

@@ -3,7 +3,6 @@ use tabled::Tabled;
 
 pub const CS_PROJ: &str = "*.csproj";
 pub const MAVEN_POM: &str = "pom.xml";
-pub const GRADLE_BUILD: &str = "build.gradle";
 pub const RUST_FILE: &str = "Cargo.toml";
 pub const GO_FILE: &str = "go.mod";
 pub const PHP_FILE: &str = "composer.json";
@@ -12,7 +11,8 @@ pub const CMAKE_FILE: &str = "CMakeLists.txt";
 pub const ELIXIR_FILE: &str = "mix.exs";
 pub const RUBY_FILE: &str = "Gemfile";
 pub const DART_FILE: &str = "pubspec.yaml";
-pub const KOTLIN_FILE: &str = "build.gradle.kts";
+pub const KOTLIN_FILE: &str = "settings.gradle.kts";
+pub const GRADLE_FILE: &str = "settings.gradle";
 pub const SWIFT_FILE: &str = "Package.swift";
 pub const PYTHON_FILE: &str = "requirements.txt";
 pub const TYPESCRIPT_FILE: &str = "tsconfig.json";
@@ -115,7 +115,7 @@ impl Language {
             Self::CSharp => CS_PROJ,
             Self::Maven => MAVEN_POM,
             Self::Kotlin => KOTLIN_FILE,
-            Self::Gradle => GRADLE_BUILD,
+            Self::Gradle => GRADLE_FILE,
             Self::Swift => SWIFT_FILE,
             Self::Dart => DART_FILE,
             Self::Elixir => ELIXIR_FILE,
@@ -136,7 +136,7 @@ pub const LANGUAGES: [(Language, &str); 17] = [
     (Language::Go, GO_FILE),
     (Language::Ruby, RUBY_FILE),
     (Language::Dart, DART_FILE),
-    (Language::Gradle, GRADLE_BUILD),
+    (Language::Gradle, GRADLE_FILE),
     (Language::Kotlin, KOTLIN_FILE),
     (Language::Swift, SWIFT_FILE),
     (Language::Php, PHP_FILE),
@@ -279,30 +279,62 @@ impl Hook {
         });
     }
     pub fn gradle(hooks: &mut Vec<Self>) {
-        hooks.push(Self {
-            language: Language::Gradle,
-            description: "Checking for outdated dependencies",
-            success: "No outdated dependencies found",
-            failure: "Outdated dependencies found",
-            file: "outdated.log",
-            command: "gradle dependencyUpdates",
-        });
-        hooks.push(Self {
-            language: Language::Gradle,
-            description: "Checking for security vulnerabilities",
-            success: "No vulnerabilities found",
-            failure: "Vulnerabilities found",
-            file: "audit.log",
-            command: "gradle dependencyCheckAnalyze",
-        });
-        hooks.push(Self {
-            language: Language::Gradle,
-            description: "Running tests for your Gradle project",
-            success: "Tests passed",
-            failure: "Tests failed",
-            file: "test.log",
-            command: "gradle test",
-        });
+        let program = if cfg!(target_os = "windows") {
+            "gradlew.bat"
+        } else {
+            "gradlew"
+        };
+        if program.contains("bat") {
+            hooks.push(Self {
+                language: Language::Gradle,
+                description: "Building your application",
+                success: "Build successful",
+                failure: "Build failed",
+                file: "build.log",
+                command: "gradlew.bat build",
+            });
+            hooks.push(Self {
+                language: Language::Gradle,
+                description: "Running unit test",
+                success: "Test passed",
+                failure: "Test failed",
+                file: "test.log",
+                command: "gradlew.bat test",
+            });
+            hooks.push(Self {
+                language: Language::Gradle,
+                description: "Running tests for your Gradle project",
+                success: "Tests passed",
+                failure: "Tests failed",
+                file: "test.log",
+                command: "gradlew.bat test",
+            });
+        } else {
+            hooks.push(Self {
+                language: Language::Gradle,
+                description: "Building your application",
+                success: "Build successful",
+                failure: "Build failed",
+                file: "build.log",
+                command: "gradlew build",
+            });
+            hooks.push(Self {
+                language: Language::Gradle,
+                description: "Running unit test",
+                success: "Test passed",
+                failure: "Test failed",
+                file: "test.log",
+                command: "gradlew test",
+            });
+            hooks.push(Self {
+                language: Language::Gradle,
+                description: "Running tests for your Gradle project",
+                success: "Tests passed",
+                failure: "Tests failed",
+                file: "test.log",
+                command: "gradlew test",
+            });
+        }
     }
 
     pub fn javascript(hooks: &mut Vec<Self>) {
@@ -650,6 +682,16 @@ impl Hook {
             command: "dart compile exe bin/main.dart",
         });
     }
+    pub fn kotlin(hooks: &mut Vec<Self>) {
+        hooks.push(Self {
+            language: Language::Kotlin,
+            description: "Running unit tests",
+            success: "All tests passed",
+            failure: "Some tests failed",
+            file: "test.log",
+            command: "gradle test",
+        });
+    }
     pub fn elixir(hooks: &mut Vec<Self>) {
         hooks.push(Self {
             language: Language::Elixir,
@@ -696,7 +738,8 @@ impl Hook {
     pub fn get(language: Language) -> Vec<Self> {
         let mut hooks: Vec<Self> = vec![];
         match language {
-            Language::Unknown | Language::R | Language::Kotlin => {}
+            Language::Unknown | Language::R => {}
+            Language::Kotlin => Self::kotlin(&mut hooks),
             Language::Typescript => Self::typescript(&mut hooks),
             Language::D => Self::d(&mut hooks),
             Language::Haskell => Self::haskell(&mut hooks),

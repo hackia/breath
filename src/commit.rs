@@ -1,4 +1,3 @@
-use crate::api::github::Issue;
 use crate::utils::types;
 use inquire::error::InquireResult;
 use inquire::{Confirm, Editor, InquireError, MultiSelect, Select, Text};
@@ -284,7 +283,7 @@ impl Commit {
     ///
     /// On bad user inputs
     ///
-    pub fn commit(&mut self, issues: &[Issue]) -> InquireResult<&mut Self> {
+    pub fn commit(&mut self) -> InquireResult<&mut Self> {
         self.ask_type()?
             .ask_scopes()?
             .ask_summary()?
@@ -295,7 +294,7 @@ impl Commit {
             .ask_who()?
             .ask_benefits()?
             .ask_notes()?
-            .ask_resolves(issues)?
+            .ask_resolves()?
             .confirm()
     }
 
@@ -471,20 +470,11 @@ impl Commit {
     /// if bad config
     /// # Errors
     /// On bad user inputs
-    pub fn ask_resolves(&mut self, issues: &[Issue]) -> InquireResult<&mut Self> {
+    pub fn ask_resolves(&mut self) -> InquireResult<&mut Self> {
         self.resolves.clear();
-        let mut fixes: Vec<String> = Vec::new();
-        for issue in issues {
-            fixes.push(format!(
-                "{} ~ {}",
-                issue.number.clone(),
-                issue.title.clone()
-            ));
-        }
         while self.resolves.is_empty() {
             self.resolves.clear();
-            self.resolves
-                .append(&mut MultiSelect::new("Select issues", fixes.clone()).prompt()?);
+            self.resolves.push(Text::new("Issues:").prompt()?);
         }
         if self.resolves.is_empty() {
             return Err(InquireError::from(Error::other("bad resolves")));
