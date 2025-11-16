@@ -279,12 +279,7 @@ impl Hook {
         });
     }
     pub fn gradle(hooks: &mut Vec<Self>) {
-        let program = if cfg!(target_os = "windows") {
-            "gradlew.bat"
-        } else {
-            "gradlew"
-        };
-        if program.contains("bat") {
+        if cfg!(target_os = "windows") {
             hooks.push(Self {
                 language: Language::Gradle,
                 description: "Building your application",
@@ -334,7 +329,7 @@ impl Hook {
                 file: "test.log",
                 command: "gradlew test",
             });
-        }
+        };
     }
 
     pub fn javascript(hooks: &mut Vec<Self>) {
