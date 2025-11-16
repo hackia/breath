@@ -403,8 +403,9 @@ impl Commit {
     /// Who are you in the team?
     ///
     /// # Errors
-    ///
     /// On bad user inputs
+    /// # Panics
+    /// if bad config
     ///
     pub fn ask_who(&mut self) -> InquireResult<&mut Self> {
         self.who.clear();

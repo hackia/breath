@@ -329,7 +329,7 @@ impl Hook {
                 file: "test.log",
                 command: "gradlew test",
             });
-        };
+        }
     }
 
     pub fn javascript(hooks: &mut Vec<Self>) {
