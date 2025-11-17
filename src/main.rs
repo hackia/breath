@@ -1,10 +1,9 @@
 pub mod commit;
-pub mod hooks;
 pub mod utils;
 
-pub mod issues;
 use crate::commit::{Commit, run_commit, vcs};
-use crate::utils::{call, run_hooks, zen};
+use crate::utils::{call, zen};
+use breathes::hooks::run_hooks;
 use clap::Arg;
 use std::process::ExitCode;
 
