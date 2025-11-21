@@ -16,7 +16,7 @@ breathes:
     - bump
 documentation:
   doc:
-    - rm -rf docs
     - cargo doc --no-deps
     - cp -r target/doc docs
+    - touch docs/.nojekyll
   man: [ ]

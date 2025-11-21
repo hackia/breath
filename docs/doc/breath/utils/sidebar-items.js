@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["KO","OK","QUIT"],"enum":["ZenOption"],"fn":["call","ok","types","zen"],"struct":["EmailValidator"]};

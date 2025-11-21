@@ -1,0 +1,9 @@
+(function() {
+    var implementors = Object.fromEntries([["breath",[["impl <a class=\"trait\" href=\"https://docs.rs/serde_core/1.0.228/serde_core/ser/trait.Serialize.html\" title=\"trait serde_core::ser::Serialize\">Serialize</a> for <a class=\"struct\" href=\"breath/commit/struct.CommitType.html\" title=\"struct breath::commit::CommitType\">CommitType</a>"],["impl <a class=\"trait\" href=\"https://docs.rs/serde_core/1.0.228/serde_core/ser/trait.Serialize.html\" title=\"trait serde_core::ser::Serialize\">Serialize</a> for <a class=\"struct\" href=\"breath/config/struct.BreathConfig.html\" title=\"struct breath::config::BreathConfig\">BreathConfig</a>"],["impl <a class=\"trait\" href=\"https://docs.rs/serde_core/1.0.228/serde_core/ser/trait.Serialize.html\" title=\"trait serde_core::ser::Serialize\">Serialize</a> for <a class=\"struct\" href=\"breath/config/struct.Config.html\" title=\"struct breath::config::Config\">Config</a>"],["impl <a class=\"trait\" href=\"https://docs.rs/serde_core/1.0.228/serde_core/ser/trait.Serialize.html\" title=\"trait serde_core::ser::Serialize\">Serialize</a> for <a class=\"struct\" href=\"breath/config/struct.Documentation.html\" title=\"struct breath::config::Documentation\">Documentation</a>"]]],["breath",[["impl <a class=\"trait\" href=\"https://docs.rs/serde_core/1.0.228/serde_core/ser/trait.Serialize.html\" title=\"trait serde_core::ser::Serialize\">Serialize</a> for <a class=\"struct\" href=\"breath/commit/struct.CommitType.html\" title=\"struct breath::commit::CommitType\">CommitType</a>"]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":57,"fragment_lengths":[1191,307]}
