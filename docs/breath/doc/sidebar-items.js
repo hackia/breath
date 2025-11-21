@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["describe","generate_doc","generate_man","is_safe_command"]};

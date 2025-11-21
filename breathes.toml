@@ -1,4 +1,0 @@
-scopes = ["commit", "breath", "hooks"]
-types = ["feat", "chore", "fix", "docs", "style", "refactor", "perf", "test", "build", "ci", "revert"]
-me = "hackia"
-repository = "breath"

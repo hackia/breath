@@ -1,0 +1,19 @@
+breathes:
+  scopes: []
+  types:
+  - feat
+  - chore
+  - fix
+  - docs
+  - style
+  - refactor
+  - perf
+  - test
+  - build
+  - ci
+  - revert
+  - release
+  - bump
+documentation:
+  doc: []
+  man: []

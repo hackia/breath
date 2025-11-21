@@ -1,4 +1,5 @@
 use crate::commit::{Commit, run_commit, vcs};
+use crate::config::load_config;
 use breathes::hooks::run_hooks;
 use crossterm::cursor::MoveTo;
 use crossterm::execute;
@@ -9,9 +10,8 @@ use inquire::{Confirm, CustomUserError, InquireError, Select};
 use regex::Regex;
 use spinners::{Spinner, Spinners};
 use std::fmt::{Display, Formatter};
-use std::fs::read_to_string;
 use std::io::{Error, stdout};
-use std::process::{Command, exit};
+use std::process::{Command, Stdio, exit};
 
 pub const OK: i32 = 7;
 pub const KO: i32 = 8;
@@ -81,7 +81,13 @@ impl StringValidator for EmailValidator {
 /// ```
 pub fn ok(message: &str, cmd: &mut Command, success: &str, failure: &str) -> Result<(), Error> {
     let mut output = Spinner::new(Spinners::Line, message.white().to_string());
-    let status = cmd.current_dir(".").spawn()?.wait()?.code();
+    let status = cmd
+        .current_dir(".")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?
+        .wait()?
+        .code();
     if let Some(response) = status
         && response.eq(&0)
     {
@@ -125,13 +131,8 @@ pub fn call(program: &str, arg: &str) -> Result<i32, Error> {
 /// if failed to parse breathes.toml
 #[must_use]
 pub fn types() -> Vec<String> {
-    let conf: crate::commit::Config = toml::from_str(
-        read_to_string("breathes.toml")
-            .expect("failed to parse breathes.toml")
-            .as_str(),
-    )
-    .expect("bad breathes.toml");
-    let mut types = conf.types;
+    let conf = load_config();
+    let mut types = conf.breathes.types;
     types.sort();
     types
 }

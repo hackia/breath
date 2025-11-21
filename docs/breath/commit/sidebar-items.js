@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Role"],"fn":["add","diff","run_commit","status","vcs"],"struct":["Commit","CommitType","Config"]};

@@ -1,9 +1,11 @@
+use crate::config::load_config;
+use crate::tree::get_tree;
 use crate::utils::types;
+use breathes::hooks::{ok, run_hooks};
 use inquire::error::InquireResult;
 use inquire::{Confirm, Editor, InquireError, MultiSelect, Select, Text};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
-use std::fs::read_to_string;
 use std::io::Error;
 use std::path::Path;
 use std::process::Command;
@@ -39,25 +41,35 @@ pub fn vcs() -> String {
 }
 ///
 /// Add source code
-///
+/// # Panics
+/// if bad config
 /// # Errors
-///
 /// Return an error if the underlying VCS command fails or exits with a non-success status.
 ///
 pub fn add() -> Result<(), Error> {
-    if Command::new(vcs())
-        .arg("add")
-        .arg(".")
-        .current_dir(".")
-        .spawn()?
-        .wait()?
-        .success()
-    {
-        Ok(())
-    } else {
-        Err(Error::other("failed to add files"))
+    if run_hooks().is_ok() {
+        let selected = MultiSelect::new("", get_tree())
+            .prompt()
+            .expect("failed to select");
+        let vcs = vcs();
+        for file in &selected {
+            assert!(
+                ok(
+                    "added file",
+                    std::process::Command::new(vcs.as_str())
+                        .arg("add")
+                        .arg(file.as_str()),
+                    "added file",
+                    "failed to add file",
+                )
+                .is_ok()
+            );
+        }
+        return Ok(());
     }
+    Err(Error::other("failed to run add"))
 }
+
 ///
 /// Display the status of the working directory
 ///
@@ -68,6 +80,7 @@ pub fn diff() -> Result<(), Error> {
     if Command::new(vcs())
         .arg("diff")
         .arg("-p")
+        .arg("--stat")
         .current_dir(".")
         .spawn()?
         .wait()?
@@ -86,13 +99,7 @@ pub fn diff() -> Result<(), Error> {
 ///
 /// Returns an error if the underlying VCS command fails or exits with a non-success status.
 pub fn status() -> Result<(), Error> {
-    if Command::new(vcs())
-        .arg("status")
-        .current_dir(".")
-        .spawn()?
-        .wait()?
-        .success()
-    {
+    if Command::new(vcs()).arg("status").spawn()?.wait()?.success() {
         return Ok(());
     }
     Err(Error::other("failed to run status"))
@@ -284,7 +291,10 @@ impl Commit {
     /// On bad user inputs
     ///
     pub fn commit(&mut self) -> InquireResult<&mut Self> {
-        self.ask_type()?
+        self.show_status()?
+            .show_diff()?
+            .add()?
+            .ask_type()?
             .ask_scopes()?
             .ask_summary()?
             .ask_roles()?
@@ -298,6 +308,48 @@ impl Commit {
             .confirm()
     }
 
+    ///
+    /// Show diff between the working directory and the last commit
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
+    pub fn show_diff(&mut self) -> InquireResult<&mut Self> {
+        diff()?;
+        Ok(self)
+    }
+
+    ///
+    /// Show status of the working directory
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
+    pub fn show_status(&mut self) -> InquireResult<&mut Self> {
+        status()?;
+        Ok(self)
+    }
+
+    ///
+    /// Add the changes to the repository
+    ///
+    /// # Errors
+    ///
+    /// On bad user inputs
+    ///
+    pub fn add(&mut self) -> InquireResult<&mut Self> {
+        if Confirm::new("Add changes to the repository?")
+            .with_default(false)
+            .prompt()?
+            .eq(&false)
+        {
+            return Err(InquireError::from(Error::other("commit aborted")));
+        }
+        add()?;
+        Ok(self)
+    }
     ///
     /// Ask teams notes
     ///
@@ -369,7 +421,7 @@ impl Commit {
         while self.summary.is_empty() {
             self.summary.clear();
             self.summary
-                .push_str(Editor::new("Commit summary:").prompt()?.as_str());
+                .push_str(Text::new("Commit summary:").prompt()?.as_str());
         }
         if self.summary.is_empty() {
             return Err(InquireError::from(Error::other("bad summary")));
@@ -409,16 +461,19 @@ impl Commit {
     ///
     pub fn ask_who(&mut self) -> InquireResult<&mut Self> {
         self.who.clear();
-        let conf: Config =
-            toml::from_str(read_to_string("breathes.toml")?.as_str()).expect("bad breathes.toml");
         while self.who.is_empty() {
             self.who.clear();
-            self.who.push_str(
-                Text::new("Who are you:")
-                    .with_default(conf.me.as_str())
-                    .prompt()?
-                    .as_str(),
-            );
+            if cfg!(windows) {
+                self.who
+                    .push_str(Text::new("Who are you:").prompt()?.as_str());
+            } else {
+                self.who.push_str(
+                    Text::new("Who are you:")
+                        .with_default(env!("USER"))
+                        .prompt()?
+                        .as_str(),
+                );
+            }
         }
         if self.who.is_empty() {
             return Err(InquireError::from(Error::other("bad who")));
@@ -466,6 +521,9 @@ impl Commit {
                     .as_str(),
             );
         }
+        if self.benefits.is_empty() {
+            return Err(InquireError::from(Error::other("bad benefits")));
+        }
         Ok(self)
     }
 
@@ -474,10 +532,32 @@ impl Commit {
     /// # Errors
     /// On bad user inputs
     pub fn ask_resolves(&mut self) -> InquireResult<&mut Self> {
+        let mut issues: Vec<String> = Vec::new();
         self.resolves.clear();
-        while self.resolves.is_empty() {
-            self.resolves.clear();
-            self.resolves.push(Text::new("Issues:").prompt()?);
+        while issues.is_empty() {
+            issues.clear();
+            issues.push(Text::new("Issues number:").prompt()?);
+        }
+        self.resolves.append(&mut issues);
+        issues.clear();
+        if Confirm::new("Commit resolve more than one issue")
+            .with_default(false)
+            .prompt()?
+        {
+            loop {
+                while issues.is_empty() {
+                    issues.clear();
+                    issues.push(Text::new("Issues number:").prompt()?);
+                }
+                if Confirm::new("Add more issue?")
+                    .with_default(false)
+                    .prompt()?
+                {
+                    self.resolves.append(&mut issues);
+                } else {
+                    break;
+                }
+            }
         }
         if self.resolves.is_empty() {
             return Err(InquireError::from(Error::other("bad resolves")));
@@ -497,9 +577,8 @@ impl Commit {
     pub fn ask_scopes(&mut self) -> InquireResult<&mut Self> {
         self.scopes.clear();
         let mut scopes = Vec::new();
-        let conf: Config =
-            toml::from_str(read_to_string("breathes.toml")?.as_str()).expect("bad breathes.toml");
-        for scope in &conf.scopes {
+        let conf = load_config();
+        for scope in &conf.breathes.scopes {
             scopes.push(scope.clone());
         }
         while self.scopes.is_empty() {
