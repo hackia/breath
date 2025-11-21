@@ -1,9 +1,13 @@
+#[doc = "A module to manage the commit process"]
 pub mod commit;
+#[doc = "A module to manage the utility functions"]
 pub mod utils;
-
-mod config;
+#[doc = "A module to manage the configuration of breath"]
+pub mod config;
+#[doc = "A module to generate documentation and manuals"]
 pub mod doc;
-mod tree;
+#[doc = "A module to get the tree of the current repository"]
+pub mod tree;
 
 use crate::commit::{Commit, add, run_commit, vcs};
 use crate::config::init_config;

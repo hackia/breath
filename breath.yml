@@ -18,5 +18,5 @@ documentation:
   doc:
     - rm -rf docs
     - cargo doc --no-deps
-    - cp -r target/doc/breath docs
+    - cp -r target/doc docs
   man: [ ]
