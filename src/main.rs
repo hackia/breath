@@ -31,7 +31,11 @@ fn breathes() -> Command {
         .subcommand(Command::new("reset").about("Reset current HEAD to the specified state"))
         .subcommand(Command::new("checkout").about("Switch branches or restore working tree files"))
         .subcommand(Command::new("clean").about("Remove untracked files from the working tree"))
-        .subcommand(Command::new("branch").about("List, create, or delete branches"))
+        .subcommand(
+            Command::new("feature")
+                .about("create a feature branch from the current branch")
+                .subcommand(Command::new("list").about("list all feature branches")),
+        )
         .subcommand(
             Command::new("tag")
                 .about("List, create, delete, or verify a tag object signed with GPG"),

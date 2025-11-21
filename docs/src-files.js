@@ -1,2 +1,0 @@
-createSrcSidebar('[["breath",["",[],["commit.rs","config.rs","doc.rs","main.rs","utils.rs"]]],["breath",["",[],["commit.rs","hooks.rs","issues.rs","main.rs","utils.rs"]]],["breath",["",[],["commit.rs","main.rs","utils.rs"]]]]');
-//{"start":19,"fragment_lengths":[74,77,54]}

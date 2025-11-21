@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["breathes","main"],"mod":["commit","config","doc","utils"]};

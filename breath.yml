@@ -1,19 +1,22 @@
 breathes:
-  scopes: []
+  scopes: [ "doc" ]
   types:
-  - feat
-  - chore
-  - fix
-  - docs
-  - style
-  - refactor
-  - perf
-  - test
-  - build
-  - ci
-  - revert
-  - release
-  - bump
+    - feat
+    - chore
+    - fix
+    - docs
+    - style
+    - refactor
+    - perf
+    - test
+    - build
+    - ci
+    - revert
+    - release
+    - bump
 documentation:
-  doc: []
-  man: []
+  doc:
+    - rm -rf docs
+    - cargo doc --no-deps
+    - cp -r target/doc/breath docs
+  man: [ ]
